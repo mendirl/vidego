@@ -1,4 +1,4 @@
-package main
+package repository
 
 import (
 	"fmt"
@@ -32,22 +32,6 @@ type Video = struct {
 	Path     string
 	Size     int64
 	Duration uint
-}
-
-type VideoEntity struct {
-	gorm.Model
-	Name     string
-	Path     string
-	Size     int64
-	Duration uint
-}
-
-type Tabler interface {
-	TableName() string
-}
-
-func (VideoEntity) TableName() string {
-	return "video"
 }
 
 type void struct{}
@@ -227,4 +211,8 @@ func TrimSuffix(s, suffix string) string {
 		s = s[:len(s)-len(suffix)]
 	}
 	return s
+}
+
+func Deduplicate() {
+
 }
