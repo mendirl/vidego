@@ -61,7 +61,7 @@ func main() {
 	//	base := "/run/media/fabien/data/O"
 	dest := "/mnt/share/misc/P/"
 
-	bases := []string{"/home/fabien/Videos", "/run/media/fabien/data" /*, "/mnt/share/misc/P/O"*/}
+	bases := []string{"/run/media/fabien/exdata/O", "/run/media/fabien/exdata/A" /*, "/mnt/share/misc/P/O"*/}
 
 	process(bases, dest)
 
@@ -212,6 +212,13 @@ func createVideo(path string) Video {
 	if err != nil {
 		fmt.Printf("ERROR : %s", err)
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			video.Duration()
+			fmt.Println("Recovered in f", r)
+		}
+	}()
 
 	duration := uint(video.Duration())
 
