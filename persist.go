@@ -54,12 +54,11 @@ type void struct{}
 
 var member void
 
-var errorPath = "/run/media/fabien/exdata/E/"
-var bases = []string{"/run/media/fabien/exdata/A1/"}
+var bases = []string{"/run/media/fabien/exdata/A2/"}
 var finalPath = "/run/media/fabien/exdata/O/"
 
 func main() {
-	fmt.Printf("#### Let's go #####")
+	fmt.Printf("#### Let's go #####\n")
 
 	process(bases)
 
@@ -102,23 +101,9 @@ func HandlePanic(ops int, path string) {
 	r := recover()
 
 	if r != nil {
-		fmt.Printf("## %d Try to recover from : %s \n", ops, r)
+		fmt.Printf("## %d something is panicking with file %s : %s\n", ops, path, r)
 	}
 
-	moveErrorFile(path)
-
-}
-
-func moveErrorFile(path string) {
-	if path != "" {
-		split := strings.Split(path, "/")
-		name := split[len(split)-1]
-
-		err := os.Rename(path, errorPath+name)
-		if err != nil {
-			fmt.Printf("## ERROR with os.Rename : %s \n", err)
-		}
-	}
 }
 
 // for each file, compute its size as int
@@ -186,10 +171,10 @@ func createVideo(path string, ops int) Video {
 
 		split := strings.Split(path, "/")
 		name := split[len(split)-1]
-		moveFile(path, name, duration)
-		sourcePath := trimSuffix(path, "/"+name)
+		finalPath := moveFile(path, name, duration)
+		//sourcePath := trimSuffix(path, "/"+name)
 
-		return Video{name, sourcePath, info.Size(), duration, duration == 0}
+		return Video{name, finalPath, info.Size(), duration, duration == 0}
 	}
 
 	return Video{"empty", path, 0, 0, false}
@@ -200,20 +185,22 @@ func moveFile(path string, name string, duration uint) string {
 
 	if duration < 1200 {
 		destPath = finalPath + "O4_under20/" + name
-	}
-	if duration < 2400 && duration >= 1220 {
+	} else if duration < 2400 && duration >= 1220 {
 		destPath = finalPath + "O3_under40/" + name
-	}
-	if duration < 3600 && duration >= 2400 {
+	} else if duration < 3600 && duration >= 2400 {
 		destPath = finalPath + "O2_under60/" + name
-	}
-	if duration >= 3600 {
+	} else if duration >= 3600 {
 		destPath = finalPath + "O1_over60/" + name
+	} else {
+		destPath = finalPath + "O5_error/" + name
 	}
 
-	err := os.Rename(path, destPath)
-	if err != nil {
-		fmt.Printf("## ERROR with os.Rename : %s \n", err)
+	if destPath != "" {
+		fmt.Printf("## MOVE file %s to %s \n", path, destPath)
+		err := os.Rename(path, destPath)
+		if err != nil {
+			fmt.Printf("## ERROR with os.Rename : %s \n", err)
+		}
 	}
 
 	return destPath
@@ -224,7 +211,7 @@ func computeDuration(path string, ops int) uint {
 
 	video, err := vidio.NewVideo(path)
 	if err != nil {
-		fmt.Printf("#%d ERROR with vidio.NewVideo : %s \n", ops, err)
+		fmt.Printf("#%d ERROR with vidio.NewVideo and file %s: %s \n", ops, path, err)
 	}
 
 	return uint(video.Duration())
