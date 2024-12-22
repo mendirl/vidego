@@ -5,10 +5,8 @@ import (
 	vidio "github.com/AlexEidt/Vidio"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"log"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 )
@@ -32,6 +30,7 @@ type Video = struct {
 	Path     string
 	Size     int64
 	Duration uint
+	Complete bool
 }
 
 type VideoEntity struct {
@@ -40,6 +39,7 @@ type VideoEntity struct {
 	Path     string
 	Size     int64
 	Duration uint
+	Complete bool
 }
 
 type Tabler interface {
@@ -54,30 +54,26 @@ type void struct{}
 
 var member void
 
+var errorPath = "/run/media/fabien/exdata/E/"
+var bases = []string{"/run/media/fabien/exdata/A1/"}
+var finalPath = "/run/media/fabien/exdata/O/"
+
 func main() {
-	//	base := "/media/fabien/exdata/A1_over60"
-	//  base := "/home/fabien/Videos"
-	//	base := "/run/media/fabien/exdata/O"
-	//	base := "/run/media/fabien/data/O"
-	dest := "/mnt/share/misc/P/"
+	fmt.Printf("#### Let's go #####")
 
-	bases := []string{"/run/media/fabien/exdata/O", "/run/media/fabien/exdata/A" /*, "/mnt/share/misc/P/O"*/}
-
-	process(bases, dest)
+	process(bases)
 
 	fmt.Printf("#### C'est fini #####")
 }
 
-func process(bases []string, dest string) {
-	pathsByDurations := CMap{value: make(map[uint][]string)}
-	durations := CSet{value: make(map[uint]void)}
+func process(bases []string) {
 	files := CStringList{value: make([]string, 0)}
 
 	dsn := "host=localhost user=myuser password=secret dbname=trygo port=5432 sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf("error %s", err)
 	}
 
 	ops := 0
@@ -86,7 +82,7 @@ func process(bases []string, dest string) {
 	// list all files present in folders
 	for _, base := range bases {
 		wg.Add(1)
-		go listFiles(base, &files, &wg)
+		go listFiles(base, &files, &wg, ops)
 	}
 	wg.Wait()
 
@@ -97,74 +93,46 @@ func process(bases []string, dest string) {
 	for _, filesSlice := range filesSlices {
 		ops++
 		wg.Add(1)
-		go reads(filesSlice, ops, &wg, &pathsByDurations, &durations, db)
+		go reads(filesSlice, ops, &wg, db)
 	}
 	wg.Wait()
-
-	move(&pathsByDurations, &durations, dest)
 }
 
-func move(result *CMap, keys *CSet, base string) {
-	result.RLock()
-	keys.RLock()
-
-	durations := make([]uint, 0, len(keys.value))
-	for k := range keys.value {
-		durations = append(durations, k)
-	}
-
-	slices.Sort(durations)
-
-	for _, duration := range durations {
-		nb := len(result.value[duration])
-		if nb > 1 {
-			fmt.Printf("duration %d has multiples files %d :\n", duration, nb)
-			for _, path := range result.value[duration] {
-				fmt.Printf("%v\n", path)
-				split := strings.Split(path, "/")
-				destPath := base + "/verify/" + split[len(split)-1]
-				fmt.Printf("will move to %v\n", destPath)
-				//				err := os.Rename(path, destPath)
-				//				if err != nil {
-				//					log.Fatal(err)
-				//				}
-			}
-		}
-	}
-
-	keys.RUnlock()
-	result.RUnlock()
-}
-func HandlePanic() {
+func HandlePanic(ops int, path string) {
 	r := recover()
 
 	if r != nil {
-		fmt.Println("RECOVER", r)
+		fmt.Printf("## %d Try to recover from : %s \n", ops, r)
+	}
+
+	moveErrorFile(path)
+
+}
+
+func moveErrorFile(path string) {
+	if path != "" {
+		split := strings.Split(path, "/")
+		name := split[len(split)-1]
+
+		err := os.Rename(path, errorPath+name)
+		if err != nil {
+			fmt.Printf("## ERROR with os.Rename : %s \n", err)
+		}
 	}
 }
 
 // for each file, compute its size as int
 // and group them by the size
-func reads(files []string, ops int, wg *sync.WaitGroup, pathsByDurations *CMap, durations *CSet, db *gorm.DB) {
+func reads(files []string, ops int, wg *sync.WaitGroup, db *gorm.DB) {
 	for _, file := range files {
-		video := createVideo(file)
-		entity := VideoEntity{Name: video.Name, Path: video.Path, Duration: video.Duration, Size: video.Size}
-		db.Create(&entity)
-		read(video, ops, pathsByDurations, durations)
+		video := createVideo(file, ops)
+		if video.Name != "empty" {
+			fmt.Printf("#%d persist video with path : %s/%s \n", ops, video.Path, video.Name)
+			entity := VideoEntity{Name: video.Name, Path: video.Path, Duration: video.Duration, Size: video.Size, Complete: video.Complete}
+			db.Create(&entity)
+		}
 	}
 	defer wg.Done()
-}
-
-func read(video Video, ops int, pathsByDurations *CMap, durations *CSet) {
-	durations.Lock()
-	pathsByDurations.Lock()
-
-	fmt.Printf("#%d - %s/%s, %db, %ds\n", ops, video.Path, video.Name, video.Size, video.Duration)
-	durations.value[video.Duration] = member
-	pathsByDurations.value[video.Duration] = append(pathsByDurations.value[video.Duration], video.Path)
-
-	pathsByDurations.Unlock()
-	durations.Unlock()
 }
 
 func chunkSlice(files []string, chunkSize int) [][]string {
@@ -183,8 +151,8 @@ func chunkSlice(files []string, chunkSize int) [][]string {
 	return chunks
 }
 
-func listFiles(base string, files *CStringList, wg *sync.WaitGroup) {
-	defer HandlePanic()
+func listFiles(base string, files *CStringList, wg *sync.WaitGroup, ops int) {
+	defer HandlePanic(ops, "")
 	defer wg.Done()
 
 	err := filepath.Walk(base,
@@ -201,35 +169,68 @@ func listFiles(base string, files *CStringList, wg *sync.WaitGroup) {
 			return nil
 		})
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 	}
 }
 
-func createVideo(path string) Video {
-	video, err := vidio.NewVideo(path)
+func createVideo(path string, ops int) Video {
+	fmt.Printf("#%d video path : %s \n", ops, path)
+	defer HandlePanic(ops, path)
+
 	info, err := os.Stat(path)
 
 	if err != nil {
-		fmt.Printf("ERROR : %s", err)
+		fmt.Printf("##%d ERROR with Stat : %s \n", ops, err)
+	} else {
+		duration := computeDuration(path, ops)
+
+		split := strings.Split(path, "/")
+		name := split[len(split)-1]
+		moveFile(path, name, duration)
+		sourcePath := trimSuffix(path, "/"+name)
+
+		return Video{name, sourcePath, info.Size(), duration, duration == 0}
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			video.Duration()
-			fmt.Println("Recovered in f", r)
-		}
-	}()
-
-	duration := uint(video.Duration())
-
-	split := strings.Split(path, "/")
-	name := split[len(split)-1]
-	sourcePath := TrimSuffix(path, "/"+name)
-
-	return Video{name, sourcePath, info.Size(), duration}
+	return Video{"empty", path, 0, 0, false}
 }
 
-func TrimSuffix(s, suffix string) string {
+func moveFile(path string, name string, duration uint) string {
+	var destPath string
+
+	if duration < 1200 {
+		destPath = finalPath + "O4_under20/" + name
+	}
+	if duration < 2400 && duration >= 1220 {
+		destPath = finalPath + "O3_under40/" + name
+	}
+	if duration < 3600 && duration >= 2400 {
+		destPath = finalPath + "O2_under60/" + name
+	}
+	if duration >= 3600 {
+		destPath = finalPath + "O1_over60/" + name
+	}
+
+	err := os.Rename(path, destPath)
+	if err != nil {
+		fmt.Printf("## ERROR with os.Rename : %s \n", err)
+	}
+
+	return destPath
+}
+
+func computeDuration(path string, ops int) uint {
+	defer HandlePanic(ops, path)
+
+	video, err := vidio.NewVideo(path)
+	if err != nil {
+		fmt.Printf("#%d ERROR with vidio.NewVideo : %s \n", ops, err)
+	}
+
+	return uint(video.Duration())
+}
+
+func trimSuffix(s string, suffix string) string {
 	if strings.HasSuffix(s, suffix) {
 		s = s[:len(s)-len(suffix)]
 	}
