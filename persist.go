@@ -183,16 +183,18 @@ func createVideo(path string, ops int) Video {
 func moveFile(path string, name string, duration uint) string {
 	var destPath string
 
-	if duration < 1200 {
+	if duration == 0 {
+		destPath = finalPath + "O5_error/" + name
+	} else if duration < 1200 {
 		destPath = finalPath + "O4_under20/" + name
-	} else if duration < 2400 && duration >= 1220 {
+	} else if duration < 2400 && duration >= 1200 {
 		destPath = finalPath + "O3_under40/" + name
 	} else if duration < 3600 && duration >= 2400 {
 		destPath = finalPath + "O2_under60/" + name
 	} else if duration >= 3600 {
 		destPath = finalPath + "O1_over60/" + name
 	} else {
-		destPath = finalPath + "O5_error/" + name
+
 	}
 
 	if destPath != "" {
