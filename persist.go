@@ -54,8 +54,10 @@ type void struct{}
 
 var member void
 
-var bases = []string{"/run/media/fabien/exdata/A2/"}
-var finalPath = "/run/media/fabien/exdata/O/"
+// var bases = []string{"/mnt/nas/misc/P"}
+var bases = []string{"/run/media/fabien/exdata/O/"}
+
+//var finalPath = "/run/media/fabien/exdata/O/"
 
 func main() {
 	fmt.Printf("#### Let's go #####\n")
@@ -68,7 +70,7 @@ func main() {
 func process(bases []string) {
 	files := CStringList{value: make([]string, 0)}
 
-	dsn := "host=localhost user=myuser password=secret dbname=trygo port=5432 sslmode=disable"
+	dsn := "host=localhost user=videogo password=videogo dbname=videogo port=5431 sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
@@ -171,42 +173,42 @@ func createVideo(path string, ops int) Video {
 
 		split := strings.Split(path, "/")
 		name := split[len(split)-1]
-		finalPath := moveFile(path, name, duration)
-		//sourcePath := trimSuffix(path, "/"+name)
+		//finalPath := moveFile(path, name, duration)
+		sourcePath := trimSuffix(path, "/"+name)
 
-		return Video{name, finalPath, info.Size(), duration, duration == 0}
+		return Video{name, sourcePath, info.Size(), duration, duration == 0}
 	}
 
 	return Video{"empty", path, 0, 0, false}
 }
 
-func moveFile(path string, name string, duration uint) string {
-	var destPath string
-
-	if duration == 0 {
-		destPath = finalPath + "O5_error/" + name
-	} else if duration < 1200 {
-		destPath = finalPath + "O4_under20/" + name
-	} else if duration < 2400 && duration >= 1200 {
-		destPath = finalPath + "O3_under40/" + name
-	} else if duration < 3600 && duration >= 2400 {
-		destPath = finalPath + "O2_under60/" + name
-	} else if duration >= 3600 {
-		destPath = finalPath + "O1_over60/" + name
-	} else {
-
-	}
-
-	if destPath != "" {
-		fmt.Printf("## MOVE file %s to %s \n", path, destPath)
-		err := os.Rename(path, destPath)
-		if err != nil {
-			fmt.Printf("## ERROR with os.Rename : %s \n", err)
-		}
-	}
-
-	return destPath
-}
+//func moveFile(path string, name string, duration uint) string {
+//	var destPath string
+//
+//	if duration == 0 {
+//		destPath = finalPath + "O5_error/" + name
+//	} else if duration < 1200 {
+//		destPath = finalPath + "O4_under20/" + name
+//	} else if duration < 2400 && duration >= 1200 {
+//		destPath = finalPath + "O3_under40/" + name
+//	} else if duration < 3600 && duration >= 2400 {
+//		destPath = finalPath + "O2_under60/" + name
+//	} else if duration >= 3600 {
+//		destPath = finalPath + "O1_over60/" + name
+//	} else {
+//
+//	}
+//
+//	if destPath != "" {
+//		fmt.Printf("## MOVE file %s to %s \n", path, destPath)
+//		err := os.Rename(path, destPath)
+//		if err != nil {
+//			fmt.Printf("## ERROR with os.Rename : %s \n", err)
+//		}
+//	}
+//
+//	return destPath
+//}
 
 func computeDuration(path string, ops int) uint {
 	defer HandlePanic(ops, path)
