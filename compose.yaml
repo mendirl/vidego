@@ -1,5 +1,5 @@
 services:
-  postgres:
+  postgres-videogo:
     image: 'postgres:latest'
     environment:
       - 'POSTGRES_DB=videogo'

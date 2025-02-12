@@ -55,7 +55,8 @@ type void struct{}
 var member void
 
 // var bases = []string{"/mnt/nas/misc/P"}
-var bases = []string{"/run/media/fabien/exdata/O/"}
+// var bases = []string{"/run/media/fabien/exdata/O/"}
+var bases = []string{"/mnt/nas/misc/P", "/run/media/fabien/exdata/O/"}
 
 //var finalPath = "/run/media/fabien/exdata/O/"
 
