@@ -29,7 +29,7 @@ type Video = struct {
 	Name     string
 	Path     string
 	Size     int64
-	Duration uint
+	Duration float64
 	Complete bool
 }
 
@@ -38,7 +38,7 @@ type VideoEntity struct {
 	Name     string
 	Path     string
 	Size     int64
-	Duration uint
+	Duration float64
 	Complete bool
 }
 
@@ -57,8 +57,6 @@ var member void
 // var bases = []string{"/mnt/nas/misc/P"}
 // var bases = []string{"/run/media/fabien/exdata/O/"}
 var bases = []string{"/mnt/nas/misc/P", "/run/media/fabien/exdata/O/"}
-
-//var finalPath = "/run/media/fabien/exdata/O/"
 
 func main() {
 	fmt.Printf("#### Let's go #####\n")
@@ -112,15 +110,21 @@ func HandlePanic(ops int, path string) {
 // for each file, compute its size as int
 // and group them by the size
 func reads(files []string, ops int, wg *sync.WaitGroup, db *gorm.DB) {
-	for _, file := range files {
-		video := createVideo(file, ops)
-		if video.Name != "empty" {
-			fmt.Printf("#%d persist video with path : %s/%s \n", ops, video.Path, video.Name)
-			entity := VideoEntity{Name: video.Name, Path: video.Path, Duration: video.Duration, Size: video.Size, Complete: video.Complete}
-			db.Create(&entity)
-		}
-	}
 	defer wg.Done()
+	for _, file := range files {
+		wg.Add(1)
+		funcName(file, ops, db, wg)
+	}
+}
+
+func funcName(file string, ops int, db *gorm.DB, wg *sync.WaitGroup) {
+	defer wg.Done()
+	video := createVideo(file, ops)
+	if video.Name != "empty" {
+		fmt.Printf("#%d persist video with path : %s/%s \n", ops, video.Path, video.Name)
+		entity := VideoEntity{Name: video.Name, Path: video.Path, Duration: video.Duration, Size: video.Size, Complete: video.Complete}
+		db.Create(&entity)
+	}
 }
 
 func chunkSlice(files []string, chunkSize int) [][]string {
@@ -174,7 +178,6 @@ func createVideo(path string, ops int) Video {
 
 		split := strings.Split(path, "/")
 		name := split[len(split)-1]
-		//finalPath := moveFile(path, name, duration)
 		sourcePath := trimSuffix(path, "/"+name)
 
 		return Video{name, sourcePath, info.Size(), duration, duration == 0}
@@ -183,35 +186,7 @@ func createVideo(path string, ops int) Video {
 	return Video{"empty", path, 0, 0, false}
 }
 
-//func moveFile(path string, name string, duration uint) string {
-//	var destPath string
-//
-//	if duration == 0 {
-//		destPath = finalPath + "O5_error/" + name
-//	} else if duration < 1200 {
-//		destPath = finalPath + "O4_under20/" + name
-//	} else if duration < 2400 && duration >= 1200 {
-//		destPath = finalPath + "O3_under40/" + name
-//	} else if duration < 3600 && duration >= 2400 {
-//		destPath = finalPath + "O2_under60/" + name
-//	} else if duration >= 3600 {
-//		destPath = finalPath + "O1_over60/" + name
-//	} else {
-//
-//	}
-//
-//	if destPath != "" {
-//		fmt.Printf("## MOVE file %s to %s \n", path, destPath)
-//		err := os.Rename(path, destPath)
-//		if err != nil {
-//			fmt.Printf("## ERROR with os.Rename : %s \n", err)
-//		}
-//	}
-//
-//	return destPath
-//}
-
-func computeDuration(path string, ops int) uint {
+func computeDuration(path string, ops int) float64 {
 	defer HandlePanic(ops, path)
 
 	video, err := vidio.NewVideo(path)
@@ -219,7 +194,7 @@ func computeDuration(path string, ops int) uint {
 		fmt.Printf("#%d ERROR with vidio.NewVideo and file %s: %s \n", ops, path, err)
 	}
 
-	return uint(video.Duration())
+	return video.Duration()
 }
 
 func trimSuffix(s string, suffix string) string {

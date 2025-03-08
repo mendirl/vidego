@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strings"
 )
 
 type VideoEntity struct {
@@ -18,9 +19,17 @@ type VideoEntity struct {
 	Complete bool
 }
 
-var sql_request_dedup = `select *
+type Tabler interface {
+	TableName() string
+}
+
+func (VideoEntity) TableName() string {
+	return "video"
+}
+
+var sql_request_putback = `select path, name, duration, size
 							from video
-								where duration in (select duration from video group by duration having count(1) > 1)`
+							where path like '%dedup%';`
 
 func main() {
 	dsn := "host=localhost user=videogo password=videogo dbname=videogo port=5431 sslmode=disable"
@@ -31,43 +40,35 @@ func main() {
 	}
 
 	var dedups []VideoEntity
-	db.Raw(sql_request_dedup).Scan(&dedups)
+	db.Raw(sql_request_putback).Scan(&dedups)
 
 	log.Printf("dedup size list %d\n", len(dedups))
 
-	nbfiles := 0
-
 	for _, dedup := range dedups {
-		log.Printf("dedup %s\n", dedup.Name)
-		source := dedup.Path + "/" + dedup.Name
-		dest := dedup.Path + "/dedup/" + dedup.Name
+		log.Printf("putback %s\n", dedup.Name)
 
-		if MoveFile(source, dest) {
-			nbfiles++
+		source := dedup.Path + "/" + dedup.Name
+
+		dest := strings.ReplaceAll(dedup.Path, "/dedup", "") + "/" + dedup.Name
+		result := MoveFile(source, dest)
+		if result {
+			// update db
+			db.Save(&dedup).Update("path", dest)
+		} else {
+			// remove from db
+			db.Delete(&dedup)
 		}
 	}
 }
 
-func MoveFile(source string, dest string) bool {
-	if exists(source) {
-		log.Println("move file ", source, " to ", dest)
-		err := os.Rename(source, dest)
+func DeleteFile(path string) bool {
+	if exists(path) {
+		err := os.Remove(path)
 		if err != nil {
 			log.Fatal(err)
 			return false
 		}
-	}
-
-	return true
-}
-
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	if err == nil {
 		return true
-	}
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
 	}
 	return false
 }
