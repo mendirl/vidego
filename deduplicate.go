@@ -1,36 +1,26 @@
 package main
 
 import (
-	"errors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"io/fs"
 	"log"
-	"os"
+	"vidego/pkg/datatype"
+	"vidego/pkg/utils"
 )
 
-type VideoEntity struct {
-	gorm.Model
-	Name     string
-	Path     string
-	Size     int64
-	Duration float64
-	Complete bool
-}
-
 var sql_request_dedup = `select *
-							from video
-								where duration in (select duration from video group by duration having count(1) > 1)`
+							from videogo.video
+								where duration in (select duration from videogo.video group by duration having count(1) > 1)`
 
 func main() {
-	dsn := "host=localhost user=videogo password=videogo dbname=videogo port=5431 sslmode=disable"
+	dsn := "host=db.mend.ovh user=fabien password=xxoca306 dbname=fabien port=5434 sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var dedups []VideoEntity
+	var dedups []datatype.VideoEntity
 	db.Raw(sql_request_dedup).Scan(&dedups)
 
 	log.Printf("dedup size list %d\n", len(dedups))
@@ -42,32 +32,8 @@ func main() {
 		source := dedup.Path + "/" + dedup.Name
 		dest := dedup.Path + "/dedup/" + dedup.Name
 
-		if MoveFile(source, dest) {
+		if utils.MoveFile(source, dest) {
 			nbfiles++
 		}
 	}
-}
-
-func MoveFile(source string, dest string) bool {
-	if exists(source) {
-		log.Println("move file ", source, " to ", dest)
-		err := os.Rename(source, dest)
-		if err != nil {
-			log.Fatal(err)
-			return false
-		}
-	}
-
-	return true
-}
-
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true
-	}
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
-	}
-	return false
 }

@@ -1,9 +1,12 @@
-drop table if exists video;
+drop schema videogo cascade ;
 
-create table video
+create schema if not exists videogo;
+
+drop table if exists videogo.video;
+
+create table videogo.video
 (
-    id          serial
-        primary key,
+    id          serial primary key,
     name        text,
     path        text,
     size        numeric,
@@ -14,3 +17,4 @@ create table video
     deduplicate boolean default false,
     complete    boolean default false
 );
+

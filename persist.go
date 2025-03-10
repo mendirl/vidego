@@ -2,57 +2,15 @@ package main
 
 import (
 	"fmt"
-	vidio "github.com/AlexEidt/Vidio"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"vidego/pkg/datatype"
+	"vidego/pkg/video"
 )
-
-type CMap = struct {
-	sync.RWMutex
-	value map[uint][]string
-}
-type CSet = struct {
-	sync.RWMutex
-	value map[uint]void
-}
-
-type CStringList = struct {
-	sync.RWMutex
-	value []string
-}
-
-type Video = struct {
-	Name     string
-	Path     string
-	Size     int64
-	Duration float64
-	Complete bool
-}
-
-type VideoEntity struct {
-	gorm.Model
-	Name     string
-	Path     string
-	Size     int64
-	Duration float64
-	Complete bool
-}
-
-type Tabler interface {
-	TableName() string
-}
-
-func (VideoEntity) TableName() string {
-	return "video"
-}
-
-type void struct{}
-
-var member void
 
 // var bases = []string{"/mnt/nas/misc/P"}
 // var bases = []string{"/run/media/fabien/exdata/O/"}
@@ -67,10 +25,14 @@ func main() {
 }
 
 func process(bases []string) {
-	files := CStringList{value: make([]string, 0)}
+	files := datatype.CStringList{Value: make([]string, 0)}
 
-	dsn := "host=localhost user=videogo password=videogo dbname=videogo port=5431 sslmode=disable"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	dsn := "host=db.mend.ovh user=fabien password=xxoca306 dbname=fabien port=5434 sslmode=disable"
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		//NamingStrategy: schema.NamingStrategy{
+		//	TablePrefix: "videogo.",
+		//}
+	})
 
 	if err != nil {
 		fmt.Printf("error %s", err)
@@ -87,7 +49,7 @@ func process(bases []string) {
 	wg.Wait()
 
 	// split this list into chuncks to parallize computation
-	filesSlices := chunkSlice(files.value, 50)
+	filesSlices := chunkSlice(files.Value, 50)
 
 	// parallize treatment for each chunck
 	for _, filesSlice := range filesSlices {
@@ -98,11 +60,11 @@ func process(bases []string) {
 	wg.Wait()
 }
 
-func HandlePanic(ops int, path string) {
+func HandlePanic(path string) {
 	r := recover()
 
 	if r != nil {
-		fmt.Printf("## %d something is panicking with file %s : %s\n", ops, path, r)
+		fmt.Printf("## something is panicking with file %s : %s\n", path, r)
 	}
 
 }
@@ -119,10 +81,10 @@ func reads(files []string, ops int, wg *sync.WaitGroup, db *gorm.DB) {
 
 func funcName(file string, ops int, db *gorm.DB, wg *sync.WaitGroup) {
 	defer wg.Done()
-	video := createVideo(file, ops)
+	video := createVideo(file)
 	if video.Name != "empty" {
 		fmt.Printf("#%d persist video with path : %s/%s \n", ops, video.Path, video.Name)
-		entity := VideoEntity{Name: video.Name, Path: video.Path, Duration: video.Duration, Size: video.Size, Complete: video.Complete}
+		entity := datatype.VideoEntity{Name: video.Name, Path: video.Path, Duration: video.Duration, Size: video.Size, Complete: video.Complete}
 		db.Create(&entity)
 	}
 }
@@ -143,8 +105,8 @@ func chunkSlice(files []string, chunkSize int) [][]string {
 	return chunks
 }
 
-func listFiles(base string, files *CStringList, wg *sync.WaitGroup, ops int) {
-	defer HandlePanic(ops, "")
+func listFiles(base string, files *datatype.CStringList, wg *sync.WaitGroup, ops int) {
+	defer HandlePanic("")
 	defer wg.Done()
 
 	err := filepath.Walk(base,
@@ -155,7 +117,7 @@ func listFiles(base string, files *CStringList, wg *sync.WaitGroup, ops int) {
 
 			if !info.IsDir() && strings.HasSuffix(path, ".mp4") {
 				files.Lock()
-				files.value = append(files.value, path)
+				files.Value = append(files.Value, path)
 				files.Unlock()
 			}
 			return nil
@@ -165,36 +127,28 @@ func listFiles(base string, files *CStringList, wg *sync.WaitGroup, ops int) {
 	}
 }
 
-func createVideo(path string, ops int) Video {
-	fmt.Printf("#%d video path : %s \n", ops, path)
-	defer HandlePanic(ops, path)
+func createVideo(path string) datatype.Video {
+	fmt.Printf("#%d video path : %s \n", path)
+	defer HandlePanic(path)
 
 	info, err := os.Stat(path)
 
 	if err != nil {
-		fmt.Printf("##%d ERROR with Stat : %s \n", ops, err)
+		fmt.Printf("## ERROR with Stat : %s \n", err)
 	} else {
-		duration := computeDuration(path, ops)
+		duration, err := video.ComputeDuration(path)
+		if err != nil {
+			fmt.Printf("#ERROR with vidio.NewVideo and file %s: %s \n", path, err)
+		}
 
 		split := strings.Split(path, "/")
 		name := split[len(split)-1]
 		sourcePath := trimSuffix(path, "/"+name)
 
-		return Video{name, sourcePath, info.Size(), duration, duration == 0}
+		return datatype.Video{name, sourcePath, info.Size(), duration, duration == 0}
 	}
 
-	return Video{"empty", path, 0, 0, false}
-}
-
-func computeDuration(path string, ops int) float64 {
-	defer HandlePanic(ops, path)
-
-	video, err := vidio.NewVideo(path)
-	if err != nil {
-		fmt.Printf("#%d ERROR with vidio.NewVideo and file %s: %s \n", ops, path, err)
-	}
-
-	return video.Duration()
+	return datatype.Video{"empty", path, 0, 0, false}
 }
 
 func trimSuffix(s string, suffix string) string {
