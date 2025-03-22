@@ -66,7 +66,7 @@ package main
 //
 //	process(bases, dest)
 //
-//	fmt.Printf("#### C'est fini #####")
+//	log.Printf("#### C'est fini #####")
 //}
 //
 //func process(bases []string, dest string) {
@@ -119,12 +119,12 @@ package main
 //	for _, duration := range durations {
 //		nb := len(result.value[duration])
 //		if nb > 1 {
-//			fmt.Printf("duration %d has multiples files %d :\n", duration, nb)
+//			log.Printf("duration %d has multiples files %d :\n", duration, nb)
 //			for _, path := range result.value[duration] {
-//				fmt.Printf("%v\n", path)
+//				log.Printf("%v\n", path)
 //				split := strings.Split(path, "/")
 //				destPath := base + "/verify/" + split[len(split)-1]
-//				fmt.Printf("will move to %v\n", destPath)
+//				log.Printf("will move to %v\n", destPath)
 //				//				err := os.Rename(path, destPath)
 //				//				if err != nil {
 //				//					log.Fatal(err)
@@ -160,7 +160,7 @@ package main
 //	durations.Lock()
 //	pathsByDurations.Lock()
 //
-//	fmt.Printf("#%d - %s/%s, %db, %ds\n", ops, video.Path, video.Name, video.Size, video.Duration)
+//	log.Printf("#%d - %s/%s, %db, %ds\n", ops, video.Path, video.Name, video.Size, video.Duration)
 //	durations.value[video.Duration] = member
 //	pathsByDurations.value[video.Duration] = append(pathsByDurations.value[video.Duration], video.Path)
 //
@@ -211,7 +211,7 @@ package main
 //	info, err := os.Stat(path)
 //
 //	if err != nil {
-//		fmt.Printf("ERROR : %s", err)
+//		log.Printf("ERROR : %s", err)
 //	}
 //
 //	defer func() {
