@@ -1,20 +1,36 @@
-package main
+package commands
 
 import (
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/spf13/cobra"
 	"log"
 	"os"
+	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
 	"vidego/pkg/video"
 )
 
-var sql_request_all = `select * from videogo.video`
+func newFilterCommand() *cobra.Command {
 
-func main() {
-	source := "/run/media/fabien/exdata/T"
+	var (
+		path string
+	)
 
+	c := &cobra.Command{
+		Use: "filter",
+		Run: func(cmd *cobra.Command, args []string) {
+			processFilter(path)
+		},
+	}
+
+	c.PersistentFlags().StringVar(&path, "path", "", "")
+
+	return c
+}
+
+var sqlRequestAll = `select * from videogo.video`
+
+func processFilter(source string) {
 	files, err := os.ReadDir(source)
 	if err != nil {
 		log.Fatal(err)
@@ -42,14 +58,15 @@ func main() {
 
 	}
 
-	dsn := "host=db.mend.ovh user=fabien password=xxoca306 dbname=fabien port=5434 sslmode=disable"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal(err)
-	}
+	toto(videos)
+
+}
+
+func toto(videos []datatype.VideoEntity) {
+	db := database.Connect()
 
 	var datas []datatype.VideoEntity
-	db.Raw(sql_request_all).Scan(&datas)
+	db.Raw(sqlRequestAll).Scan(&datas)
 
 	dataInDbByDuration := transform(datas)
 
@@ -95,7 +112,6 @@ func main() {
 		}
 
 	}
-
 }
 
 func findFolder(duration float64) string {
@@ -125,5 +141,4 @@ func transform(videos []datatype.VideoEntity) map[float64][]datatype.VideoEntity
 	}
 
 	return videoMap
-
 }

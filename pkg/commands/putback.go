@@ -1,32 +1,33 @@
-package main
+package commands
 
 import (
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/spf13/cobra"
 	"log"
+	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
 )
 
-var sql_request_putback = `select *
+func newPutbackCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use: "putback",
+		Run: func(cmd *cobra.Command, args []string) {
+			processPutback()
+		},
+	}
+
+	return c
+}
+
+var sqlRequestPutback = `select *
 							from videogo.video
 								where duration in (select duration from videogo.video group by duration having count(1) > 1)`
 
-/*
-`select path, name, duration, size
-from videogo.video
-where path like '%dedup%';`
-*/
-func main() {
-	dsn := "host=db.mend.ovh user=fabien password=xxoca306 dbname=fabien port=5434 sslmode=disable"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-
-	if err != nil {
-		log.Fatal(err)
-	}
+func processPutback() {
+	db := database.Connect()
 
 	var dedups []datatype.VideoEntity
-	db.Raw(sql_request_putback).Scan(&dedups)
+	db.Raw(sqlRequestPutback).Scan(&dedups)
 
 	log.Printf("dedup size list %d\n", len(dedups))
 

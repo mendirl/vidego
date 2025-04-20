@@ -1,43 +1,41 @@
-package main
+package commands
 
 import (
-	"gorm.io/driver/postgres"
+	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
 	"vidego/pkg/video"
 )
 
-// var bases = []string{"/mnt/nas/misc/P"}
-// var bases = []string{"/run/media/fabien/exdata/O/"}
-var bases = []string{"/mnt/nas/misc/P", "/run/media/fabien/exdata/O/"}
+func newPersistCommand() *cobra.Command {
 
-func main() {
-	log.Printf("#### Let's go #####\n")
+	var (
+		path []string
+	)
 
-	process(bases)
+	c := &cobra.Command{
+		Use: "persist",
+		Run: func(cmd *cobra.Command, args []string) {
+			processPersist(path)
+		},
+	}
 
-	log.Printf("#### C'est fini #####")
+	c.PersistentFlags().StringSliceVar(&path, "path", []string{}, "")
+
+	return c
 }
 
-func process(bases []string) {
+func processPersist(bases []string) {
 	files := datatype.CStringList{Value: make([]string, 0)}
 
-	dsn := "host=db.mend.ovh user=fabien password=xxoca306 dbname=fabien port=5434 sslmode=disable"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		//NamingStrategy: schema.NamingStrategy{
-		//	TablePrefix: "videogo.",
-		//}
-	})
-
-	if err != nil {
-		log.Printf("error %s", err)
-	}
+	db := database.Connect()
 
 	var wg sync.WaitGroup
 
@@ -48,10 +46,10 @@ func process(bases []string) {
 	}
 	wg.Wait()
 
-	// split this list into chuncks to parallize computation
+	// split this list into chunks to paralyze computation
 	filesSlices := chunkSlice(files.Value, 50)
 
-	// parallize treatment for each chunck
+	// paralyze treatment for each chunk
 	for _, filesSlice := range filesSlices {
 		wg.Add(1)
 		go reads(filesSlice, &wg, db)

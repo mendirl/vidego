@@ -1,4 +1,4 @@
-drop schema videogo cascade ;
+drop schema if exists videogo cascade ;
 
 create schema if not exists videogo;
 
@@ -18,3 +18,10 @@ create table videogo.video
     complete    boolean default false
 );
 
+
+
+
+select *
+from videogo.video
+where duration in (select duration from videogo.video group by duration having count(1) > 1)
+order by duration desc;

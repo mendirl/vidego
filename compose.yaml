@@ -1,9 +1,0 @@
-services:
-  postgres-videogo:
-    image: 'postgres:latest'
-    environment:
-      - 'POSTGRES_DB=videogo'
-      - 'POSTGRES_PASSWORD=videogo'
-      - 'POSTGRES_USER=videogo'
-    ports:
-      - '5431:5432'
