@@ -2,8 +2,11 @@ package commands
 
 import (
 	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 	"log"
 	"os"
+	"strings"
+	"sync"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
@@ -32,19 +35,37 @@ func newFilterCommand() *cobra.Command {
 var sqlRequestAll = `select * from videogo.video`
 
 func processFilter(source string) {
+	var wg sync.WaitGroup
+
+	videos := make([]datatype.VideoEntity, 0)
+	wg.Add(1)
+	go computeVideos(source, videos, &wg)
+
+	dataInDbByDuration := make(map[float64][]datatype.VideoEntity)
+	db := database.Connect()
+	wg.Add(1)
+	go computeDb(db, dataInDbByDuration, &wg)
+
+	wg.Wait()
+
+	toto(videos, dataInDbByDuration, db)
+}
+
+func computeVideos(source string, videos []datatype.VideoEntity, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	files, err := os.ReadDir(source)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	videos := make([]datatype.VideoEntity, 0)
 
 	for _, file := range files {
 		// define size of the file
 		fileInfo, err := file.Info()
 		if err != nil {
 			log.Printf("impossible to open %s with error %v \n", fileInfo, err)
-			return
+			continue
 		}
 		//define its duration for a video
 		newVideo := video.CreateVideo(source + "/" + fileInfo.Name())
@@ -58,19 +79,25 @@ func processFilter(source string) {
 		videos = append(videos, entity)
 
 	}
-
-	toto(videos)
-
 }
 
-func toto(videos []datatype.VideoEntity) {
-	db := database.Connect()
+func computeDb(db *gorm.DB, dataInDbByDuration map[float64][]datatype.VideoEntity, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	var datas []datatype.VideoEntity
-	db.Raw(sqlRequestAll).Scan(&datas)
+	var videos []datatype.VideoEntity
+	db.Raw(sqlRequestAll).Scan(&videos)
 
-	dataInDbByDuration := transform(datas)
+	for _, itVideo := range videos {
+		if _, ok := dataInDbByDuration[itVideo.Duration]; !ok {
+			tab := make([]datatype.VideoEntity, 0)
+			dataInDbByDuration[itVideo.Duration] = append(tab, itVideo)
+		} else {
+			dataInDbByDuration[itVideo.Duration] = append(dataInDbByDuration[itVideo.Duration], itVideo)
+		}
+	}
+}
 
+func toto(videos []datatype.VideoEntity, dataInDbByDuration map[float64][]datatype.VideoEntity, db *gorm.DB) {
 	for _, itVideo := range videos {
 		// check if the video is already in dataInDbByDuration
 		// if not, copy the file into a new folder
@@ -101,17 +128,20 @@ func toto(videos []datatype.VideoEntity) {
 				for _, oldVideo := range oldVideos {
 
 					src := oldVideo.Path + "/" + oldVideo.Name
-					dst := oldVideo.Path + "/dedup/" + oldVideo.Name
 
-					log.Printf("%f move old file %s to %s \n", oldVideo.Duration, src, dst)
-					if utils.MoveFile(src, dst) {
-						db.Save(&oldVideo).Update("path", oldVideo.Path+"/dedup")
+					if !strings.Contains(oldVideo.Path, "dedup") {
+
+						dstPath := oldVideo.Path + "/dedup"
+						dst := dstPath + "/" + oldVideo.Name
+
+						log.Printf("%f move old file %s to %s \n", oldVideo.Duration, src, dst)
+						if utils.MoveFile(src, dst) {
+							db.Save(&oldVideo).Update("path", dstPath)
+						}
 					}
 				}
 			}
-
 		}
-
 	}
 }
 
@@ -127,19 +157,4 @@ func findFolder(duration float64) string {
 	} else {
 		return "/mnt/nas/misc/P/A1_over60"
 	}
-}
-
-func transform(videos []datatype.VideoEntity) map[float64][]datatype.VideoEntity {
-	videoMap := make(map[float64][]datatype.VideoEntity)
-
-	for _, itVideo := range videos {
-		if _, ok := videoMap[itVideo.Duration]; !ok {
-			tab := make([]datatype.VideoEntity, 0)
-			videoMap[itVideo.Duration] = append(tab, itVideo)
-		} else {
-			videoMap[itVideo.Duration] = append(videoMap[itVideo.Duration], itVideo)
-		}
-	}
-
-	return videoMap
 }
