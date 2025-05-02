@@ -3,6 +3,7 @@ package commands
 import (
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -37,21 +38,22 @@ var sqlRequestAll = `select * from videogo.video`
 func processFilter(source string) {
 	var wg sync.WaitGroup
 
-	videos := make([]datatype.VideoEntity, 0)
-	wg.Add(1)
-	go computeVideos(source, videos, &wg)
+	videos := datatype.CVideoEntityList{Value: make([]datatype.VideoEntity, 0)}
 
-	dataInDbByDuration := make(map[float64][]datatype.VideoEntity)
+	wg.Add(1)
+	go computeVideos(source, &videos, &wg)
+
+	dataInDbByDuration := datatype.CVideoEntityMap{Value: make(map[float64][]datatype.VideoEntity)}
 	db := database.Connect()
 	wg.Add(1)
-	go computeDb(db, dataInDbByDuration, &wg)
+	go computeDb(db, &dataInDbByDuration, &wg)
 
 	wg.Wait()
 
-	toto(videos, dataInDbByDuration, db)
+	toto(&videos, &dataInDbByDuration, db)
 }
 
-func computeVideos(source string, videos []datatype.VideoEntity, wg *sync.WaitGroup) {
+func computeVideos(source string, videos *datatype.CVideoEntityList, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	files, err := os.ReadDir(source)
@@ -67,41 +69,48 @@ func computeVideos(source string, videos []datatype.VideoEntity, wg *sync.WaitGr
 			log.Printf("impossible to open %s with error %v \n", fileInfo, err)
 			continue
 		}
-		//define its duration for a video
-		newVideo := video.CreateVideo(source + "/" + fileInfo.Name())
-
-		if newVideo.Name == "" {
+		if fileInfo.Name() == "" {
 			log.Printf("## ERROR with file %s : %v \n", fileInfo.Name(), err)
 			continue
 		}
-		log.Printf("video : %v \n", newVideo)
-		entity := datatype.VideoEntity{Name: newVideo.Name, Path: newVideo.Path, Duration: newVideo.Duration, Size: newVideo.Size, Complete: newVideo.Complete}
-		videos = append(videos, entity)
+		computeVideo(source, videos, fileInfo)
 
 	}
 }
 
-func computeDb(db *gorm.DB, dataInDbByDuration map[float64][]datatype.VideoEntity, wg *sync.WaitGroup) {
+func computeVideo(source string, videos *datatype.CVideoEntityList, fileInfo fs.FileInfo) {
+	//define its duration for a video
+	newVideo := video.CreateVideo(source + "/" + fileInfo.Name())
+
+	log.Printf("video : %v \n", newVideo)
+	entity := datatype.VideoEntity{Name: newVideo.Name, Path: newVideo.Path, Duration: newVideo.Duration, Size: newVideo.Size, Complete: newVideo.Complete}
+
+	videos.Lock()
+	videos.Value = append(videos.Value, entity)
+	videos.Unlock()
+}
+
+func computeDb(db *gorm.DB, dataInDbByDuration *datatype.CVideoEntityMap, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	var videos []datatype.VideoEntity
 	db.Raw(sqlRequestAll).Scan(&videos)
 
 	for _, itVideo := range videos {
-		if _, ok := dataInDbByDuration[itVideo.Duration]; !ok {
+		if _, ok := dataInDbByDuration.Value[itVideo.Duration]; !ok {
 			tab := make([]datatype.VideoEntity, 0)
-			dataInDbByDuration[itVideo.Duration] = append(tab, itVideo)
+			dataInDbByDuration.Value[itVideo.Duration] = append(tab, itVideo)
 		} else {
-			dataInDbByDuration[itVideo.Duration] = append(dataInDbByDuration[itVideo.Duration], itVideo)
+			dataInDbByDuration.Value[itVideo.Duration] = append(dataInDbByDuration.Value[itVideo.Duration], itVideo)
 		}
 	}
 }
 
-func toto(videos []datatype.VideoEntity, dataInDbByDuration map[float64][]datatype.VideoEntity, db *gorm.DB) {
-	for _, itVideo := range videos {
+func toto(videos *datatype.CVideoEntityList, dataInDbByDuration *datatype.CVideoEntityMap, db *gorm.DB) {
+	for _, itVideo := range videos.Value {
 		// check if the video is already in dataInDbByDuration
 		// if not, copy the file into a new folder
-		if _, videoOrderers := dataInDbByDuration[itVideo.Duration]; !videoOrderers {
+		if _, videoOrderers := dataInDbByDuration.Value[itVideo.Duration]; !videoOrderers {
 			folder := findFolder(itVideo.Duration)
 
 			src := itVideo.Path + "/" + itVideo.Name
@@ -124,7 +133,7 @@ func toto(videos []datatype.VideoEntity, dataInDbByDuration map[float64][]dataty
 				itVideo.Path = folder
 				db.Create(&itVideo)
 
-				oldVideos := dataInDbByDuration[itVideo.Duration]
+				oldVideos := dataInDbByDuration.Value[itVideo.Duration]
 				for _, oldVideo := range oldVideos {
 
 					src := oldVideo.Path + "/" + oldVideo.Name

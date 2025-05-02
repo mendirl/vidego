@@ -23,8 +23,13 @@ type Tabler interface {
 }
 type CMap = struct {
 	sync.RWMutex
-	value map[uint][]string
+	Value map[uint][]string
 }
+type CVideoEntityMap = struct {
+	sync.RWMutex
+	Value map[float64][]VideoEntity
+}
+
 type CSet = struct {
 	sync.RWMutex
 	value map[uint]void
@@ -36,6 +41,11 @@ var member void
 type CStringList = struct {
 	sync.RWMutex
 	Value []string
+}
+
+type CVideoEntityList = struct {
+	sync.RWMutex
+	Value []VideoEntity
 }
 
 type Video = struct {
