@@ -10,7 +10,7 @@ import (
 	"sync"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
-	"vidego/pkg/utils"
+	"vidego/pkg/panic"
 	"vidego/pkg/video"
 )
 
@@ -21,7 +21,8 @@ func newPersistCommand() *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use: "persist",
+		Use:  "persist",
+		Long: "from input folders, put video info in db",
 		Run: func(cmd *cobra.Command, args []string) {
 			processPersist(path)
 		},
@@ -94,7 +95,7 @@ func chunkSlice(files []string, chunkSize int) [][]string {
 }
 
 func listFiles(base string, files *datatype.CStringList, wg *sync.WaitGroup) {
-	defer utils.HandlePanic("")
+	defer panic.HandlePanic("")
 	defer wg.Done()
 
 	err := filepath.Walk(base,

@@ -17,7 +17,8 @@ func newFilterCommand() *cobra.Command {
 	)
 
 	c := &cobra.Command{
-		Use: "filter",
+		Use:  "filter",
+		Long: "from a temporary folder, put them in the right folder or dedup folder, compare from db",
 		Run: func(cmd *cobra.Command, args []string) {
 			processFilter(path)
 		},

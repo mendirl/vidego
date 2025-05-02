@@ -11,12 +11,14 @@ import (
 )
 
 var sqlRequestDedup = `select *
-							from videogo.video
-								where duration in (select duration from videogo.video where path not like '%dedup%' group by duration having count(1) > 1)`
+						from videogo.video
+						where path not like '%dedup%'
+						  and duration in (select duration from videogo.video where path not like '%dedup' group by duration having count(1) > 1)`
 
 func newDedupCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use: "dedup",
+		Use:  "dedup",
+		Long: "from db, move duplicate video to dedup folder",
 		Run: func(cmd *cobra.Command, args []string) {
 			processDedup()
 		},

@@ -7,14 +7,13 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"strings"
 )
 
 func MoveFile(source string, dest string) bool {
 	if Exists(source) {
 		if Exists(dest) {
 			log.Printf("file dst already exists %s\n", dest)
-			return false
+			DeleteFile(dest)
 		}
 
 		log.Printf("move file %s to %s\n", source, dest)
@@ -77,11 +76,4 @@ func Exists(path string) bool {
 		return false
 	}
 	return false
-}
-
-func TrimSuffix(s string, suffix string) string {
-	if strings.HasSuffix(s, suffix) {
-		s = s[:len(s)-len(suffix)]
-	}
-	return s
 }

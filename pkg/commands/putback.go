@@ -10,7 +10,8 @@ import (
 
 func newPutbackCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use: "putback",
+		Use:  "putback",
+		Long: "from the dedup folder, put video back to its original folder",
 		Run: func(cmd *cobra.Command, args []string) {
 			processPutback()
 		},
