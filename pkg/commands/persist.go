@@ -2,6 +2,7 @@ package commands
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"gorm.io/gorm"
 	"log"
 	"os"
@@ -17,20 +18,46 @@ import (
 func newPersistCommand() *cobra.Command {
 
 	var (
-		path []string
+		path    []string
+		cfgFile string
 	)
 
 	c := &cobra.Command{
 		Use:  "persist",
 		Long: "from input folders, put video info in db",
 		Run: func(cmd *cobra.Command, args []string) {
+			path = viper.GetStringSlice("path")
 			processPersist(path)
 		},
 	}
 
+	cobra.OnInitialize(func() { initConfig(cfgFile) })
+
 	c.PersistentFlags().StringSliceVar(&path, "path", []string{}, "")
+	err := viper.BindPFlag("path", c.PersistentFlags().Lookup("path"))
+	if err != nil {
+		return nil
+	}
+
+	c.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vidego.yaml)")
+	viper.BindPFlag("config", c.PersistentFlags().Lookup("config"))
 
 	return c
+}
+
+func initConfig(cfgFile string) {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		viper.AddConfigPath("$HOME")
+		viper.SetConfigName(".vidego")
+	}
+
+	viper.SetConfigType("yaml")
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Printf("Error reading config file, %s", err)
+	}
 }
 
 func processPersist(bases []string) {

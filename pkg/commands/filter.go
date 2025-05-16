@@ -62,6 +62,8 @@ func computeVideos(source string, videos *datatype.CVideoEntityList, wg *sync.Wa
 		return
 	}
 
+	var wg1 sync.WaitGroup
+
 	for _, file := range files {
 		// define size of the file
 		fileInfo, err := file.Info()
@@ -73,12 +75,17 @@ func computeVideos(source string, videos *datatype.CVideoEntityList, wg *sync.Wa
 			log.Printf("## ERROR with file %s : %v \n", fileInfo.Name(), err)
 			continue
 		}
-		computeVideo(source, videos, fileInfo)
+
+		wg1.Add(1)
+		go computeVideo(source, videos, fileInfo, &wg1)
 
 	}
+
+	wg1.Wait()
 }
 
-func computeVideo(source string, videos *datatype.CVideoEntityList, fileInfo fs.FileInfo) {
+func computeVideo(source string, videos *datatype.CVideoEntityList, fileInfo fs.FileInfo, wg *sync.WaitGroup) {
+	defer wg.Done()
 	//define its duration for a video
 	newVideo := video.CreateVideo(source + "/" + fileInfo.Name())
 
@@ -96,57 +103,95 @@ func computeDb(db *gorm.DB, dataInDbByDuration *datatype.CVideoEntityMap, wg *sy
 	var videos []datatype.VideoEntity
 	db.Raw(sqlRequestAll).Scan(&videos)
 
+	var wg1 sync.WaitGroup
+
 	for _, itVideo := range videos {
-		if _, ok := dataInDbByDuration.Value[itVideo.Duration]; !ok {
-			tab := make([]datatype.VideoEntity, 0)
-			dataInDbByDuration.Value[itVideo.Duration] = append(tab, itVideo)
-		} else {
-			dataInDbByDuration.Value[itVideo.Duration] = append(dataInDbByDuration.Value[itVideo.Duration], itVideo)
-		}
+		wg1.Add(1)
+		go computeVideoEntity(dataInDbByDuration, itVideo, &wg1)
+	}
+
+	wg1.Wait()
+}
+
+func computeVideoEntity(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatype.VideoEntity, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	dataInDbByDuration.RLock()
+	_, entities := dataInDbByDuration.Value[itVideo.Duration]
+	dataInDbByDuration.RUnlock()
+
+	if !entities {
+		tab := make([]datatype.VideoEntity, 0)
+		dataInDbByDuration.Lock()
+		dataInDbByDuration.Value[itVideo.Duration] = append(tab, itVideo)
+		dataInDbByDuration.Unlock()
+	} else {
+		dataInDbByDuration.Lock()
+		dataInDbByDuration.Value[itVideo.Duration] = append(dataInDbByDuration.Value[itVideo.Duration], itVideo)
+		dataInDbByDuration.Unlock()
 	}
 }
 
 func toto(videos *datatype.CVideoEntityList, dataInDbByDuration *datatype.CVideoEntityMap, db *gorm.DB) {
+
+	var wg sync.WaitGroup
+
 	for _, itVideo := range videos.Value {
-		// check if the video is already in dataInDbByDuration
-		// if not, copy the file into a new folder
-		if _, videoOrderers := dataInDbByDuration.Value[itVideo.Duration]; !videoOrderers {
-			folder := findFolder(itVideo.Duration)
+		wg.Add(1)
+		//go
+		moveFileMaybe(dataInDbByDuration, itVideo, db, &wg)
+	}
 
-			src := itVideo.Path + "/" + itVideo.Name
-			dst := folder + "/" + itVideo.Name
+	wg.Wait()
+}
 
-			log.Printf("%f move file %s to %s \n", itVideo.Duration, src, dst)
-			if utils.MoveFile(src, dst) {
-				itVideo.Path = folder
-				db.Create(&itVideo)
-			}
+func moveFileMaybe(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatype.VideoEntity, db *gorm.DB, wg *sync.WaitGroup) {
+	defer wg.Done()
+	// check if the video is already in dataInDbByDuration
+	// if not, copy the file into a new folder
 
-		} else {
-			// if yes, copy both files to a new folder to dedup them
-			folder := findFolder(itVideo.Duration)
-			src := itVideo.Path + "/" + itVideo.Name
-			dst := folder + "/dedup/" + itVideo.Name
+	//dataInDbByDuration.RLock()
+	_, videoOrderers := dataInDbByDuration.Value[itVideo.Duration]
+	//dataInDbByDuration.RUnlock()
+	if !videoOrderers {
+		folder := findFolder(itVideo.Duration)
 
-			log.Printf("%f move new file %s to %s \n", itVideo.Duration, src, dst)
-			if utils.MoveFile(src, dst) {
-				itVideo.Path = folder
-				db.Create(&itVideo)
+		src := itVideo.Path + "/" + itVideo.Name
+		dst := folder + "/" + itVideo.Name
 
-				oldVideos := dataInDbByDuration.Value[itVideo.Duration]
-				for _, oldVideo := range oldVideos {
+		log.Printf("%f move file %s to %s \n", itVideo.Duration, src, dst)
+		if utils.MoveFile(src, dst) {
+			itVideo.Path = folder
+			db.Create(&itVideo)
+		}
 
-					src := oldVideo.Path + "/" + oldVideo.Name
+	} else {
+		// if yes, copy both files to a new folder to dedup them
+		folder := findFolder(itVideo.Duration)
+		src := itVideo.Path + "/" + itVideo.Name
+		dst := folder + "/dedup/" + itVideo.Name
 
-					if !strings.Contains(oldVideo.Path, "dedup") {
+		log.Printf("%f move new file %s to %s \n", itVideo.Duration, src, dst)
+		if utils.MoveFile(src, dst) {
+			itVideo.Path = folder
+			db.Create(&itVideo)
 
-						dstPath := oldVideo.Path + "/dedup"
-						dst := dstPath + "/" + oldVideo.Name
+			//dataInDbByDuration.RLock()
+			oldVideos := dataInDbByDuration.Value[itVideo.Duration]
+			//dataInDbByDuration.RUnlock()
 
-						log.Printf("%f move old file %s to %s \n", oldVideo.Duration, src, dst)
-						if utils.MoveFile(src, dst) {
-							db.Save(&oldVideo).Update("path", dstPath)
-						}
+			for _, oldVideo := range oldVideos {
+
+				src := oldVideo.Path + "/" + oldVideo.Name
+
+				if !strings.Contains(oldVideo.Path, "dedup") {
+
+					dstPath := oldVideo.Path + "/dedup"
+					dst := dstPath + "/" + oldVideo.Name
+
+					log.Printf("%f move old file %s to %s \n", oldVideo.Duration, src, dst)
+					if utils.MoveFile(src, dst) {
+						db.Save(&oldVideo).Update("path", dstPath)
 					}
 				}
 			}
