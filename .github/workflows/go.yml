@@ -21,11 +21,11 @@ jobs:
       with:
         go-version: '1.24.x'
 
-    - name: Install dependencies
-      run: go get .
+    - name: build
+      run: make build
 
-    - name: Build
-      run: go build -v -o dedup-cli
+#    - name: Build
+#      run: go build -v -o dedup-cli
 
     # - name: Test
     #   run: go test -v ./...

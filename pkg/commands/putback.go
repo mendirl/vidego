@@ -3,6 +3,7 @@ package commands
 import (
 	"github.com/spf13/cobra"
 	"log"
+	"strings"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
@@ -22,7 +23,7 @@ func newPutbackCommand() *cobra.Command {
 
 var sqlRequestPutback = `select *
 							from videogo.video
-								where duration in (select duration from videogo.video group by duration having count(1) > 1)`
+								where deduplicate is false`
 
 func processPutback() {
 	db := database.Connect()
@@ -35,15 +36,15 @@ func processPutback() {
 	for _, dedup := range dedups {
 		log.Printf("putback %s\n", dedup.Name)
 
-		source := dedup.Path + "/dedup/" + dedup.Name
-		dest := dedup.Path + "/" + dedup.Name
+		src := dedup.Path + "/" + dedup.Name
+		newDstPath := strings.ReplaceAll(dedup.Path, "/dedup", "")
+		dst := newDstPath + "/" + dedup.Name
 
-		//dest := strings.ReplaceAll(dedup.Path, "/dedup", "") + "/" + dedup.Name
-		result := utils.MoveFile(source, dest)
-		existsInDest := utils.Exists(dest)
-		if !result && !existsInDest {
-			// remove from db
+		if utils.MoveFile(src, dst) {
+			db.Save(&dedup).Update("path", newDstPath).Update("deduplicate", true)
+		} else {
 			db.Delete(&dedup)
 		}
+
 	}
 }
