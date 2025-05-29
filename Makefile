@@ -1,3 +1,6 @@
+install:
+	go get .
+
 build:
 	go build -o out/dedup-cli main.go
 
