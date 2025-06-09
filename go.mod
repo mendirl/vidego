@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/AlexEidt/Vidio v1.5.1
+	github.com/lib/pq v1.10.9
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	gorm.io/driver/postgres v1.6.0

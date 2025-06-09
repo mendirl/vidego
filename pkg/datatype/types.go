@@ -1,9 +1,20 @@
 package datatype
 
 import (
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"sync"
 )
+
+type ConfigEntity struct {
+	gorm.Model
+	Name   string         `gorm:"uniqueIndex"`
+	Values pq.StringArray `gorm:"type:text[]"`
+}
+
+func (ConfigEntity) TableName() string {
+	return "videogo.config"
+}
 
 type VideoEntity struct {
 	gorm.Model

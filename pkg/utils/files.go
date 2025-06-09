@@ -9,6 +9,19 @@ import (
 	"os"
 )
 
+func MoveAndCheckFile(source string, dest string, file string) bool {
+	if !Exists(dest) {
+		log.Printf("destination folder %s does not exist, creating it\n", dest)
+		err := os.MkdirAll(dest, 0755)
+		if err != nil {
+			log.Printf("error creating destination folder %s: %v\n", dest, err)
+			return false
+		}
+	}
+
+	return MoveFile(source+"/"+file, dest+"/"+file)
+}
+
 func MoveFile(source string, dest string) bool {
 	if Exists(source) {
 		if Exists(dest) {
@@ -25,7 +38,7 @@ func MoveFile(source string, dest string) bool {
 		return true
 
 	} else {
-		log.Printf("file src doesnt exist anymore %s\n", dest)
+		log.Printf("file src doesnt exist anymore %s\n", source)
 	}
 
 	return false
