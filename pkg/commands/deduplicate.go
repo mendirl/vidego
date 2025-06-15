@@ -35,24 +35,45 @@ func processDedup() {
 
 	log.Printf("dedup size list %d\n", len(dedups))
 
+	var size = len(dedups)
+	var counter = size
+	var counterMutex sync.Mutex
+
+	const maxGoroutines = 10
+	semaphore := make(chan struct{}, maxGoroutines)
 	var wg sync.WaitGroup
 
+	log.Printf("Starting to process %d videos\n", size)
+
 	for _, dedup := range dedups {
-		//wg.Add(1)
-		move(dedup, db, &wg)
+
+		semaphore <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer func() {
+				<-semaphore
+				counterMutex.Lock()
+				counter--
+				remaining := counter
+				counterMutex.Unlock()
+				wg.Done()
+				log.Printf("Processed video: %s. Remaining: %d/%d\n", dedup.Name, remaining, size)
+			}()
+			move(dedup, db)
+		}()
 	}
 
-	//wg.Wait()
+	wg.Wait()
+	log.Printf("All %d videos have been processed\n", size)
 }
 
-func move(dedup datatype.VideoEntity, db *gorm.DB, wg *sync.WaitGroup) {
-	//defer wg.Done()
+func move(dedup datatype.VideoEntity, db *gorm.DB) {
 
 	log.Printf("dedup %s\n", dedup.Name)
-	source := dedup.Path + "/" + dedup.Name
-	dest := dedup.Path + "/dedup/" + dedup.Name
+	source := dedup.Path
+	dest := dedup.Path + "/dedup"
 
-	if utils.MoveFile(source, dest) {
-		db.Save(&dedup).Update("path", dedup.Path+"/dedup")
+	if utils.MoveAndCheckFile(source, dest, dedup.Name) {
+		db.Save(&dedup).Update("path", dedup.Path+"/dedup").Update("deduplicate", true)
 	}
 }

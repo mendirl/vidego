@@ -19,7 +19,7 @@ func computeDuration(path string) (float64, error) {
 func CreateVideo(path string) datatype.Video {
 	defer panic.HandlePanic(path)
 
-	log.Printf("#video path : %s \n", path)
+	log.Printf("# video path : %s \n", path)
 	//defer HandlePanic(path)
 
 	info, err := os.Stat(path)
@@ -36,7 +36,12 @@ func CreateVideo(path string) datatype.Video {
 		name := split[len(split)-1]
 		sourcePath := tools.TrimSuffix(path, "/"+name)
 
-		return datatype.Video{Name: name, Path: sourcePath, Size: info.Size(), Duration: duration, Complete: duration == 0}
+		var complete = duration == 0
+		if strings.Contains(sourcePath, "ALL") {
+			complete = true
+		}
+
+		return datatype.Video{Name: name, Path: sourcePath, Size: info.Size(), Duration: duration, Complete: complete}
 	}
 
 	return datatype.Video{Name: "empty", Path: path}

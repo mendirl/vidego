@@ -2,8 +2,10 @@ package commands
 
 import (
 	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 	"log"
 	"strings"
+	"sync"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
@@ -23,7 +25,7 @@ func newPutbackCommand() *cobra.Command {
 
 var sqlRequestPutback = `select *
 							from videogo.video
-								where deduplicate is false`
+								where deduplicate is true`
 
 func processPutback() {
 	db := database.Connect()
@@ -31,20 +33,46 @@ func processPutback() {
 	var dedups []datatype.VideoEntity
 	db.Raw(sqlRequestPutback).Scan(&dedups)
 
-	log.Printf("dedup size list %d\n", len(dedups))
+	const maxGoroutines = 5
+	semaphore := make(chan struct{}, maxGoroutines)
 
+	var size = len(dedups)
+	var counter = size
+	var counterMutex sync.Mutex
+
+	log.Printf("Starting to process %d videos\n", size)
+
+	var wg sync.WaitGroup
 	for _, dedup := range dedups {
-		log.Printf("putback %s\n", dedup.Name)
+		semaphore <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				<-semaphore
+				counterMutex.Lock()
+				counter--
+				remaining := counter
+				counterMutex.Unlock()
+				log.Printf("Putback video: %s. Remaining: %d/%d\n", dedup.Name, remaining, size)
+			}()
+			moveBack(dedup, db)
+		}()
+	}
+	wg.Wait()
+	log.Printf("All %d videos have been processed\n", size)
+}
 
-		src := dedup.Path + "/" + dedup.Name
-		newDstPath := strings.ReplaceAll(dedup.Path, "/dedup", "")
-		dst := newDstPath + "/" + dedup.Name
+func moveBack(dedup datatype.VideoEntity, db *gorm.DB) {
+	log.Printf("putback %s\n", dedup.Name)
 
-		if utils.MoveFile(src, dst) {
-			db.Save(&dedup).Update("path", newDstPath).Update("deduplicate", true)
-		} else {
-			db.Delete(&dedup)
-		}
+	src := dedup.Path + "/" + dedup.Name
+	newDstPath := strings.ReplaceAll(dedup.Path, "/dedup", "")
+	dst := newDstPath + "/" + dedup.Name
 
+	if utils.MoveFile(src, dst) {
+		db.Save(&dedup).Update("path", newDstPath).Update("deduplicate", false)
+	} else {
+		db.Delete(&dedup)
 	}
 }

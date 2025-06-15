@@ -23,7 +23,7 @@ func newOrganizeCommand() *cobra.Command {
 	return c
 }
 
-var sqlRequestConfig = `select * from videogo.config`
+var sqlRequestConfig = `select * from videogo.config order by position`
 var sqlRequestOrganize = `select * from videogo.video where complete is false and deleted_at is null;`
 
 func processOrganize() {
