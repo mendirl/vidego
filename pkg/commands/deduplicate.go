@@ -1,19 +1,20 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
-	"gorm.io/gorm"
 	"log"
 	"sync"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
+
+	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 )
 
 var sqlRequestDedup = `select *
-						from videogo.video
+						from vidego.video
 						where path not like '%dedup%'
-						  and duration in (select duration from videogo.video where path not like '%dedup' group by duration having count(1) > 1)`
+						  and duration in (select duration from vidego.video where path not like '%dedup' group by duration having count(1) > 1)`
 
 func newDedupCommand() *cobra.Command {
 	c := &cobra.Command{

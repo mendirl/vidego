@@ -1,14 +1,15 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
-	"gorm.io/gorm"
 	"log"
 	"strings"
 	"sync"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
+
+	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 )
 
 func newOrganizeCommand() *cobra.Command {
@@ -23,8 +24,8 @@ func newOrganizeCommand() *cobra.Command {
 	return c
 }
 
-var sqlRequestConfig = `select * from videogo.config order by position`
-var sqlRequestOrganize = `select * from videogo.video where complete is false and deleted_at is null;`
+var sqlRequestConfig = `select * from vidego.config order by position`
+var sqlRequestOrganize = `select * from vidego.video where complete is false and deleted_at is null;`
 
 func processOrganize() {
 	db := database.Connect()

@@ -1,14 +1,15 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
-	"gorm.io/gorm"
 	"log"
 	"strings"
 	"sync"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
+
+	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 )
 
 func newPutbackCommand() *cobra.Command {
@@ -24,8 +25,8 @@ func newPutbackCommand() *cobra.Command {
 }
 
 var sqlRequestPutback = `select *
-							from videogo.video
-								where deduplicate is true`
+							from vidego.video
+								where deduplicate is true and deleted_at is null`
 
 func processPutback() {
 	db := database.Connect()
@@ -64,7 +65,7 @@ func processPutback() {
 }
 
 func moveBack(dedup datatype.VideoEntity, db *gorm.DB) {
-	log.Printf("putback %s\n", dedup.Name)
+	log.Printf("Putback %s\n", dedup.Name)
 
 	src := dedup.Path + "/" + dedup.Name
 	newDstPath := strings.ReplaceAll(dedup.Path, "/dedup", "")

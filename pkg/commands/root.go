@@ -16,6 +16,7 @@ func Execute() error {
 		newPutbackCommand(),
 		newOrganizeCommand(),
 		newMoveCommand(),
+		newDeleteCommand(),
 	}
 
 	for command := range commands {

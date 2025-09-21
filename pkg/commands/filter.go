@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
-	"gorm.io/gorm"
 	"io/fs"
 	"log"
 	"os"
@@ -12,6 +10,9 @@ import (
 	"vidego/pkg/datatype"
 	"vidego/pkg/utils"
 	"vidego/pkg/video"
+
+	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 )
 
 func newFilterCommand() *cobra.Command {
@@ -33,7 +34,7 @@ func newFilterCommand() *cobra.Command {
 	return c
 }
 
-var sqlRequestAll = `select * from videogo.video`
+var sqlRequestAll = `select * from vidego.video`
 
 func processFilter(source string) {
 	var wg sync.WaitGroup
@@ -134,30 +135,50 @@ func computeVideoEntity(dataInDbByDuration *datatype.CVideoEntityMap, itVideo da
 
 func toto(videos *datatype.CVideoEntityList, dataInDbByDuration *datatype.CVideoEntityMap, db *gorm.DB) {
 
+	var size = len(videos.Value)
+	var counter = size
+	var counterMutex sync.Mutex
+
+	const maxGoroutines = 5
+	semaphore := make(chan struct{}, maxGoroutines)
 	var wg sync.WaitGroup
 
+	log.Printf("Starting to process %d videos\n", size)
+
 	for _, itVideo := range videos.Value {
+		semaphore <- struct{}{}
 		wg.Add(1)
-		//go
-		moveFileMaybe(dataInDbByDuration, itVideo, db, &wg)
+		go func() {
+			defer func() {
+				<-semaphore
+				counterMutex.Lock()
+				counter--
+				remaining := counter
+				counterMutex.Unlock()
+				wg.Done()
+				log.Printf("Processed video: %s. Remaining: %d/%d\n", itVideo.Name, remaining, size)
+			}()
+			moveFileMaybe(dataInDbByDuration, itVideo, db)
+		}()
+
 	}
 
 	wg.Wait()
+	log.Printf("All %d videos have been processed\n", size)
 }
 
-func moveFileMaybe(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatype.VideoEntity, db *gorm.DB, wg *sync.WaitGroup) {
-	defer wg.Done()
+func moveFileMaybe(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatype.VideoEntity, db *gorm.DB) {
 	// check if the video is already in dataInDbByDuration
 	// if not, copy the file into a new folder
 
 	//dataInDbByDuration.RLock()
 	_, videoOrderers := dataInDbByDuration.Value[itVideo.Duration]
 	//dataInDbByDuration.RUnlock()
-	if !videoOrderers {
-		folder := findFolder(itVideo.Duration)
+	folder := findFolder(itVideo.Duration)
 
+	if !videoOrderers {
 		src := itVideo.Path + "/" + itVideo.Name
-		dst := folder + "/" + itVideo.Name
+		dst := strings.Replace(itVideo.Path, "/T", "", 1) + folder + "/" + itVideo.Name
 
 		log.Printf("%f move file %s to %s \n", itVideo.Duration, src, dst)
 		if utils.MoveFile(src, dst) {
@@ -167,7 +188,6 @@ func moveFileMaybe(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatyp
 
 	} else {
 		// if yes, copy both files to a new folder to dedup them
-		folder := findFolder(itVideo.Duration)
 		src := itVideo.Path + "/" + itVideo.Name
 		dst := folder + "/dedup/" + itVideo.Name
 
@@ -200,15 +220,19 @@ func moveFileMaybe(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatyp
 }
 
 func findFolder(duration float64) string {
-	if duration < 1200 {
-		return "/run/media/fabien/exdata/O/O5_under20"
+	if duration < 600 {
+		return "/O/O1_under10"
+	} else if duration < 1200 {
+		return "/O/O2_under20"
 	} else if duration < 1800 {
-		return "/run/media/fabien/exdata/O/O4_under30"
+		return "/O/O3_under30"
 	} else if duration < 2400 {
-		return "/mnt/nas/misc/P/A3_under40"
+		return "/O/O4_under40"
+	} else if duration < 3000 {
+		return "/O/O5_under50"
 	} else if duration < 3600 {
-		return "/mnt/nas/misc/P/A2_under60"
+		return "/O/O6_under60"
 	} else {
-		return "/mnt/nas/misc/P/A1_over60"
+		return "/O/O7_over60"
 	}
 }

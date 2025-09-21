@@ -3,7 +3,6 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -45,27 +44,33 @@ func MoveFile(source string, dest string) bool {
 }
 
 func moveFileInner(sourcePath, destPath string) error {
-	inputFile, err := os.Open(sourcePath)
-	if err != nil {
-		return fmt.Errorf("couldn't open source file: %s", err)
-	}
-	outputFile, err := os.Create(destPath)
-	if err != nil {
-		inputFile.Close()
-		return fmt.Errorf("couldn't open dest file: %s", err)
-	}
-	defer outputFile.Close()
-	_, err = io.Copy(outputFile, inputFile)
-	inputFile.Close()
-	if err != nil {
-		return fmt.Errorf("writing to output file failed: %s", err)
-	}
-	// The copy was successful, so now delete the original file
-	err = os.Remove(sourcePath)
-	if err != nil {
-		return fmt.Errorf("failed removing original file: %s", err)
+	// Déplacer le fichier sans copie (rename atomique sur le même filesystem)
+	if err := os.Rename(sourcePath, destPath); err != nil {
+		return fmt.Errorf("failed to move file: %w", err)
 	}
 	return nil
+
+	//inputFile, err := os.Open(sourcePath)
+	//if err != nil {
+	//	return fmt.Errorf("couldn't open source file: %s", err)
+	//}
+	//outputFile, err := os.Create(destPath)
+	//if err != nil {
+	//	inputFile.Close()
+	//	return fmt.Errorf("couldn't open dest file: %s", err)
+	//}
+	//defer outputFile.Close()
+	//_, err = io.Copy(outputFile, inputFile)
+	//inputFile.Close()
+	//if err != nil {
+	//	return fmt.Errorf("writing to output file failed: %s", err)
+	//}
+	//// The copy was successful, so now delete the original file
+	//err = os.Remove(sourcePath)
+	//if err != nil {
+	//	return fmt.Errorf("failed removing original file: %s", err)
+	//}
+	//return nil
 }
 
 func DeleteFile(path string) bool {

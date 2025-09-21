@@ -1,13 +1,14 @@
 package video
 
 import (
-	vidio "github.com/AlexEidt/Vidio"
 	"log"
 	"os"
 	"strings"
 	"vidego/pkg/datatype"
 	"vidego/pkg/panic"
 	"vidego/pkg/tools"
+
+	vidio "github.com/AlexEidt/Vidio"
 )
 
 func computeDuration(path string) (float64, error) {
@@ -19,7 +20,7 @@ func computeDuration(path string) (float64, error) {
 func CreateVideo(path string) datatype.Video {
 	defer panic.HandlePanic(path)
 
-	log.Printf("# video path : %s \n", path)
+	log.Printf("#create Video with path : %s \n", path)
 	//defer HandlePanic(path)
 
 	info, err := os.Stat(path)

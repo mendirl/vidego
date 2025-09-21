@@ -1,9 +1,10 @@
 package datatype
 
 import (
+	"sync"
+
 	"github.com/lib/pq"
 	"gorm.io/gorm"
-	"sync"
 )
 
 type ConfigEntity struct {
@@ -13,7 +14,7 @@ type ConfigEntity struct {
 }
 
 func (ConfigEntity) TableName() string {
-	return "videogo.config"
+	return "vidego.config"
 }
 
 type VideoEntity struct {
@@ -26,7 +27,7 @@ type VideoEntity struct {
 }
 
 func (VideoEntity) TableName() string {
-	return "videogo.video"
+	return "vidego.video"
 }
 
 type Tabler interface {
