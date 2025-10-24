@@ -22,6 +22,11 @@ func MoveAndCheckFile(source string, dest string, file string) bool {
 }
 
 func MoveFile(source string, dest string) bool {
+	if source == dest {
+		log.Printf("source and destination are the same %s\n", dest)
+		return false
+	}
+
 	if Exists(source) {
 		if Exists(dest) {
 			log.Printf("file dst already exists %s\n", dest)

@@ -1,9 +1,6 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"gorm.io/gorm"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,6 +10,10 @@ import (
 	"vidego/pkg/datatype"
 	"vidego/pkg/panic"
 	"vidego/pkg/video"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"gorm.io/gorm"
 )
 
 func newPersistCommand() *cobra.Command {
@@ -45,58 +46,50 @@ func newPersistCommand() *cobra.Command {
 	return c
 }
 
-func initConfig(cfgFile string) {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		viper.AddConfigPath("$HOME")
-		viper.SetConfigName(".vidego")
-	}
-
-	viper.SetConfigType("yaml")
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("Error reading config file, %s", err)
-	}
-}
-
 func processPersist(bases []string) {
 	files := datatype.CStringList{Value: make([]string, 0)}
 
 	db := database.Connect()
 
+	const maxGoroutines = 10
+	semaphore := make(chan struct{}, maxGoroutines)
 	var wg sync.WaitGroup
 
 	// list all files present in folders
 	for _, base := range bases {
+		log.Printf("# let's analyze folder : %s\n", base)
+		semaphore <- struct{}{}
 		wg.Add(1)
-		go listFiles(base, &files, &wg)
+		go func() {
+			defer func() {
+				<-semaphore
+				wg.Done()
+			}()
+			listFiles(base, &files)
+		}()
 	}
 	wg.Wait()
 
 	// split this list into chunks to paralyze computation
-	filesSlices := chunkSlice(files.Value, 50)
+	//filesSlices := chunkSlice(files.Value, 50)
 
 	// paralyze treatment for each chunk
-	for _, filesSlice := range filesSlices {
+	for idx, file := range files.Value {
+		log.Printf("# let's analyze a new slice %d:\n", idx)
 		wg.Add(1)
-		go reads(filesSlice, &wg, db)
+		semaphore <- struct{}{}
+		go func() {
+			defer func() {
+				<-semaphore
+				wg.Done()
+			}()
+			funcName(file, db)
+		}()
 	}
 	wg.Wait()
 }
 
-// for each file, compute its size as int
-// and group them by the size
-func reads(files []string, wg *sync.WaitGroup, db *gorm.DB) {
-	defer wg.Done()
-	for _, file := range files {
-		wg.Add(1)
-		funcName(file, db, wg)
-	}
-}
-
-func funcName(file string, db *gorm.DB, wg *sync.WaitGroup) {
-	defer wg.Done()
+func funcName(file string, db *gorm.DB) {
 	newVideo := video.CreateVideo(file)
 	if newVideo.Name != "empty" {
 		log.Printf("# persist video with path : %s/%s \n", newVideo.Path, newVideo.Name)
@@ -105,25 +98,8 @@ func funcName(file string, db *gorm.DB, wg *sync.WaitGroup) {
 	}
 }
 
-func chunkSlice(files []string, chunkSize int) [][]string {
-	var chunks [][]string
-	for i := 0; i < len(files); i += chunkSize {
-		end := i + chunkSize
-
-		// necessary check to avoid slicing beyond files capacity
-		if end > len(files) {
-			end = len(files)
-		}
-
-		chunks = append(chunks, files[i:end])
-	}
-
-	return chunks
-}
-
-func listFiles(base string, files *datatype.CStringList, wg *sync.WaitGroup) {
+func listFiles(base string, files *datatype.CStringList) {
 	defer panic.HandlePanic("")
-	defer wg.Done()
 
 	err := filepath.Walk(base,
 		func(path string, info os.FileInfo, err error) error {
