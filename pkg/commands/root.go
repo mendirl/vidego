@@ -17,9 +17,9 @@ func Execute() error {
 		newDedupCommand(),
 		newFilterCommand(),
 		newPutbackCommand(),
-		newOrganizeCommand(),
 		newMoveCommand(),
 		newDeleteCommand(),
+		newSortCommand(),
 	}
 
 	for command := range commands {

@@ -8,7 +8,10 @@ run:
 	go run main.go
 
 persist:
-	go run main.go persist --path "/mnt/d/O,/mnt/e/O,/mnt/f/O,/mnt/h/O,/mnt/n/O,/mnt/n/N"
+	go run main.go persist --path "/mnt/n/N"
+
+sorting:
+	go run main.go sort --paths "/mnt/n/O,/mnt/d/O,/mnt/g/O"
 
 dedup:
 	go run main.go dedup
