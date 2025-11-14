@@ -1,3 +1,7 @@
+mount:
+	sudo mount -t  drvfs F: /mnt/f
+	sudo mount -t  drvfs N: /mnt/n
+
 install:
 	go get .
 
