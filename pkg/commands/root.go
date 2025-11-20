@@ -13,7 +13,6 @@ func Execute() error {
 	}
 
 	commands := []*cobra.Command{
-		newPersistCommand(),
 		newDedupCommand(),
 		newFilterCommand(),
 		newPutbackCommand(),

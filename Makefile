@@ -15,7 +15,7 @@ persist:
 	go run main.go persist --path "/mnt/n/N"
 
 sorting:
-	go run main.go sort --paths "/mnt/n/O,/mnt/d/O,/mnt/g/O"
+	go run main.go sort --paths "/mnt/x"
 
 dedup:
 	go run main.go dedup

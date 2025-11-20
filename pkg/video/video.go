@@ -11,10 +11,13 @@ import (
 	vidio "github.com/AlexEidt/Vidio"
 )
 
-func computeDuration(path string) (float64, error) {
+func computeDuration(path string) float64 {
 	video, err := vidio.NewVideo(path)
+	if err != nil {
+		log.Printf("#ERROR with vidio.NewVideo and file %s: %s \n", path, err)
+	}
 
-	return video.Duration(), err
+	return video.Duration()
 }
 
 func CreateVideo(path string) datatype.Video {
@@ -28,10 +31,7 @@ func CreateVideo(path string) datatype.Video {
 	if err != nil {
 		log.Printf("## ERROR with Stat : %s \n", err)
 	} else {
-		duration, err := computeDuration(path)
-		if err != nil {
-			log.Printf("#ERROR with vidio.NewVideo and file %s: %s \n", path, err)
-		}
+		duration := computeDuration(path)
 
 		split := strings.Split(path, "/")
 		name := split[len(split)-1]

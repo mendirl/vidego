@@ -191,6 +191,8 @@ func findBase(path string) string {
 		return "/mnt/h"
 	} else if strings.Contains(path, "/n/") {
 		return "/mnt/n"
+	} else if strings.Contains(path, "/x/") {
+		return "/mnt/x"
 	} else {
 		return "/mnt/n/T"
 	}
