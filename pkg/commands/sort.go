@@ -20,6 +20,7 @@ func newSortCommand() *cobra.Command {
 
 	var (
 		paths   []string
+		move    bool
 		cfgFile string
 	)
 
@@ -28,17 +29,17 @@ func newSortCommand() *cobra.Command {
 		Long: "sort videos into folders",
 		Run: func(cmd *cobra.Command, args []string) {
 			paths = viper.GetStringSlice("paths")
-			processSort(paths)
+			move = viper.GetBool("move")
+			processSort(paths, move)
 		},
 	}
 
 	cobra.OnInitialize(func() { initConfig(cfgFile) })
 
 	c.PersistentFlags().StringSliceVar(&paths, "paths", []string{}, "")
-	err := viper.BindPFlag("paths", c.PersistentFlags().Lookup("paths"))
-	if err != nil {
-		return nil
-	}
+	viper.BindPFlag("paths", c.PersistentFlags().Lookup("paths"))
+	c.PersistentFlags().BoolVar(&move, "move", true, "")
+	viper.BindPFlag("move", c.PersistentFlags().Lookup("move"))
 
 	c.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vidego.yaml)")
 	viper.BindPFlag("config", c.PersistentFlags().Lookup("config"))
@@ -48,7 +49,7 @@ func newSortCommand() *cobra.Command {
 
 var sqlRequestConfig = `select * from vidego.config order by position`
 
-func processSort(paths []string) {
+func processSort(paths []string, move bool) {
 	db := database.Connect()
 
 	var configs []datatype.ConfigEntity
@@ -63,14 +64,14 @@ func processSort(paths []string) {
 			defer func() {
 				wg.Done()
 			}()
-			sortFolder(path, configs, db)
+			sortFolder(path, configs, db, move)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB) {
+func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool) {
 	const maxGoroutines = 10
 	semaphore := make(chan struct{}, maxGoroutines)
 	var wg sync.WaitGroup
@@ -91,7 +92,7 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB) {
 					<-semaphore
 					wg.Done()
 				}()
-				handleFile(filePath, configs, db)
+				handleFile(filePath, configs, db, move)
 			}(path)
 
 			return nil
@@ -103,7 +104,7 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB) {
 	wg.Wait()
 }
 
-func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB) {
+func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool) {
 	newVideo := video.CreateVideo(path)
 
 	if newVideo.Duration == 0 {
@@ -117,6 +118,8 @@ func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB) {
 	src = newVideo.Path
 	if match {
 		dst = computeNamedNaseFolder(path, config)
+	} else if !move {
+		return
 	} else {
 		dst = computeOtherNameFolder(path, newVideo)
 	}

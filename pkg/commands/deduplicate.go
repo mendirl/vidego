@@ -2,6 +2,7 @@ package commands
 
 import (
 	"log"
+	"strings"
 	"sync"
 	"vidego/pkg/database"
 	"vidego/pkg/datatype"
@@ -11,10 +12,25 @@ import (
 	"gorm.io/gorm"
 )
 
-var sqlRequestDedup = `select *
-						from vidego.video
-						where path not like '%dedup%'
-						  and duration in (select duration from vidego.video where path not like '%dedup' group by duration having count(1) > 1)`
+var sqlRequestDedup = `WITH doublons AS (
+    SELECT
+        REPLACE(path, '/dedup', '') as path_normalise,
+        FLOOR(duration) as duration_entiere
+    FROM vidego.video
+    WHERE path IS NOT NULL
+      AND duration IS NOT NULL
+    GROUP BY REPLACE(path, '/dedup', ''), FLOOR(duration)
+    HAVING COUNT(*) > 1
+),
+all_dedup as (
+SELECT v.*
+FROM vidego.video v
+INNER JOIN doublons d
+    ON REPLACE(v.path, '/dedup', '') = d.path_normalise
+    AND FLOOR(v.duration) = d.duration_entiere
+ORDER BY REPLACE(v.path, '/dedup', ''), FLOOR(v.duration), v.id)
+select * from all_dedup where
+                            path not like '%dedup%'`
 
 func newDedupCommand() *cobra.Command {
 	c := &cobra.Command{
@@ -72,9 +88,16 @@ func move(dedup datatype.VideoEntity, db *gorm.DB) {
 
 	log.Printf("dedup %s\n", dedup.Name)
 	source := dedup.Path
-	dest := dedup.Path + "/dedup"
+	var dest string
+	if strings.Contains(dedup.Path, "dedup/dedup") {
+		dest = strings.Replace(dedup.Path, "dedup/dedup", "dedup", 1)
+	} else if !strings.Contains(dedup.Path, "dedup") {
+		dest = dedup.Path + "/dedup"
+	} else {
+		dest = dedup.Path
+	}
 
 	if utils.MoveAndCheckFile(source, dest, dedup.Name) {
-		db.Save(&dedup).Update("path", dedup.Path+"/dedup").Update("deduplicate", true)
+		db.Save(&dedup).Update("path", dest).Update("deduplicate", true)
 	}
 }
