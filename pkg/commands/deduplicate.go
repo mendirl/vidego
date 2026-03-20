@@ -16,21 +16,21 @@ var sqlRequestDedup = `WITH doublons AS (
     SELECT
         REPLACE(path, '/dedup', '') as path_normalise,
         FLOOR(duration) as duration_entiere
-    FROM vidego.video
-    WHERE path IS NOT NULL
-      AND duration IS NOT NULL
-    GROUP BY REPLACE(path, '/dedup', ''), FLOOR(duration)
-    HAVING COUNT(*) > 1
-),
-all_dedup as (
-SELECT v.*
-FROM vidego.video v
-INNER JOIN doublons d
-    ON REPLACE(v.path, '/dedup', '') = d.path_normalise
-    AND FLOOR(v.duration) = d.duration_entiere
-ORDER BY REPLACE(v.path, '/dedup', ''), FLOOR(v.duration), v.id)
-select * from all_dedup where
-                            path not like '%dedup%'`
+		FROM vidego.video
+		WHERE path IS NOT NULL
+		  AND duration IS NOT NULL
+		GROUP BY REPLACE(path, '/dedup', ''), FLOOR(duration)
+		HAVING COUNT(*) > 1
+	),
+	all_dedup as (
+	SELECT v.*
+	FROM vidego.video v
+	INNER JOIN doublons d
+		ON REPLACE(v.path, '/dedup', '') = d.path_normalise
+		AND FLOOR(v.duration) = d.duration_entiere
+	ORDER BY REPLACE(v.path, '/dedup', ''), FLOOR(v.duration), v.id)
+	select * from all_dedup where
+    path not like '%dedup%'`
 
 func newDedupCommand() *cobra.Command {
 	c := &cobra.Command{

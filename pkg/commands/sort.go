@@ -1,9 +1,11 @@
 package commands
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"vidego/pkg/database"
@@ -144,61 +146,29 @@ func computeOtherNameFolder(path string, video datatype.Video) string {
 	duration := video.Duration
 	base := findBase(path)
 
-	if duration < 300 {
-		return base + "/O/O1_under05"
-	} else if duration < 600 {
-		return base + "/O/O2_under10"
-	} else if duration < 900 {
-		return base + "/O/O3_under15"
-	} else if duration < 1200 {
-		return base + "/O/O4_under20"
-	} else if duration < 1500 {
-		return base + "/O/O5_under25"
-	} else if duration < 1800 {
-		return base + "/O/O6_under30"
-	} else if duration < 2100 {
-		return base + "/O/O7_under35"
-	} else if duration < 2400 {
-		return base + "/O/O8_under40"
-	} else if duration < 2700 {
-		return base + "/O/O9_under45"
-	} else if duration < 3000 {
-		return base + "/O/O10_under50"
-	} else if duration < 3300 {
-		return base + "/O/O11_under55"
-	} else if duration < 3600 {
-		return base + "/O/O12_under60"
-	} else if duration < 3900 {
-		return base + "/O/O13_under65"
-	} else if duration < 4200 {
-		return base + "/O/O14_under70"
-	} else if duration > 7200 {
+	if duration > 7200 {
 		return base + "/O/O17_over120"
-	} else if duration > 5400 {
+	}
+	if duration > 5400 {
 		return base + "/O/O16_over90"
-	} else {
+	}
+	if duration > 4200 {
 		return base + "/O/O15_over70"
 	}
+
+	index := (duration / 300) + 1
+	limit := index * 5
+
+	return fmt.Sprintf("%s/O/O%d_under%02d", base, index, limit)
 }
 
 func findBase(path string) string {
-	if strings.Contains(path, "/d/") {
-		return "/mnt/d"
-	} else if strings.Contains(path, "/e/") {
-		return "/mnt/e"
-	} else if strings.Contains(path, "/f/") {
-		return "/mnt/f"
-	} else if strings.Contains(path, "/g/") {
-		return "/mnt/g"
-	} else if strings.Contains(path, "/h/") {
-		return "/mnt/h"
-	} else if strings.Contains(path, "/n/") {
-		return "/mnt/n"
-	} else if strings.Contains(path, "/x/") {
-		return "/mnt/x"
-	} else {
-		return "/mnt/n/T"
+	re := regexp.MustCompile(`/([cdefghnx])/`)
+	match := re.FindStringSubmatch(path)
+	if len(match) > 1 {
+		return "/mnt/" + match[1]
 	}
+	return "/mnt/n/T"
 }
 
 func findInConfigs(videoName string, configs []datatype.ConfigEntity) (bool, string) {
