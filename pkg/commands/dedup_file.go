@@ -12,23 +12,50 @@ import (
 	"vidego/pkg/video"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func newDedupFileCommand() *cobra.Command {
+	var (
+		paths []string
+	)
+
 	c := &cobra.Command{
-		Use:   "dedupFile [directory]",
+		Use:   "dedupFile",
 		Short: "Move duplicate video files (by duration) to a single _dedup folder at root directory",
-		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			dir := args[0]
-			err := processDedupLocal(dir)
-			if err != nil {
-				log.Fatalf("Error: %v", err)
+			if len(paths) == 0 && len(args) > 0 {
+				paths = args
 			}
+
+			if len(paths) == 0 {
+				log.Fatalf("Error: at least one directory must be specified via --paths or arguments")
+			}
+
+			processDedupFile(paths)
 		},
 	}
 
+	c.Flags().StringSliceVar(&paths, "paths", []string{}, "Directories to scan for duplicates")
+	viper.BindPFlag("paths", c.Flags().Lookup("paths"))
+
 	return c
+}
+
+func processDedupFile(paths []string) {
+	var wg sync.WaitGroup
+	for _, dir := range paths {
+		log.Printf("Analyzing folder: %s", dir)
+		wg.Add(1)
+		go func(d string) {
+			defer wg.Done()
+			err := processDedupLocal(d)
+			if err != nil {
+				log.Printf("Error processing %s: %v", d, err)
+			}
+		}(dir)
+	}
+	wg.Wait()
 }
 
 func processDedupLocal(root string) error {
