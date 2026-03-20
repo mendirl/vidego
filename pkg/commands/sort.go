@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,6 +22,7 @@ func newSortCommand() *cobra.Command {
 	var (
 		paths   []string
 		move    bool
+		search  bool
 		cfgFile string
 	)
 
@@ -32,7 +32,8 @@ func newSortCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			paths = viper.GetStringSlice("paths")
 			move = viper.GetBool("move")
-			processSort(paths, move)
+			search = viper.GetBool("search")
+			processSort(paths, move, search)
 		},
 	}
 
@@ -42,6 +43,8 @@ func newSortCommand() *cobra.Command {
 	viper.BindPFlag("paths", c.PersistentFlags().Lookup("paths"))
 	c.PersistentFlags().BoolVar(&move, "move", true, "")
 	viper.BindPFlag("move", c.PersistentFlags().Lookup("move"))
+	c.PersistentFlags().BoolVar(&search, "search", true, "search in config to move to named folders")
+	viper.BindPFlag("search", c.PersistentFlags().Lookup("search"))
 
 	c.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vidego.yaml)")
 	viper.BindPFlag("config", c.PersistentFlags().Lookup("config"))
@@ -51,29 +54,31 @@ func newSortCommand() *cobra.Command {
 
 var sqlRequestConfig = `select * from vidego.config order by position`
 
-func processSort(paths []string, move bool) {
+func processSort(paths []string, move bool, search bool) {
 	db := database.Connect()
 
 	var configs []datatype.ConfigEntity
-	db.Raw(sqlRequestConfig).Scan(&configs)
+	if search {
+		db.Raw(sqlRequestConfig).Scan(&configs)
+	}
 
 	var wg sync.WaitGroup
 
 	for _, path := range paths {
 		log.Printf("# let's analyze folder : %s\n", path)
 		wg.Add(1)
-		go func() {
+		go func(p string) {
 			defer func() {
 				wg.Done()
 			}()
-			sortFolder(path, configs, db, move)
-		}()
+			sortFolder(p, configs, db, move, search)
+		}(path)
 	}
 
 	wg.Wait()
 }
 
-func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool) {
+func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool, search bool) {
 	const maxGoroutines = 10
 	semaphore := make(chan struct{}, maxGoroutines)
 	var wg sync.WaitGroup
@@ -94,7 +99,7 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 					<-semaphore
 					wg.Done()
 				}()
-				handleFile(filePath, configs, db, move)
+				handleFile(filePath, configs, db, move, search)
 			}(path)
 
 			return nil
@@ -106,7 +111,7 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 	wg.Wait()
 }
 
-func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool) {
+func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool, search bool) {
 	newVideo := video.CreateVideo(path)
 
 	if newVideo.Duration == 0 {
@@ -114,13 +119,22 @@ func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 	}
 
 	var dst, src string
-
-	var match, config = findInConfigs(newVideo.Name, configs)
-
 	src = newVideo.Path
-	if match {
-		dst = computeNamedNaseFolder(path, config)
-	} else if !move {
+
+	if search {
+		var match, config = findInConfigs(newVideo.Name, configs)
+
+		if match {
+			dst = computeNamedNaseFolder(path, config)
+			if utils.MoveAndCheckFile(src, dst, newVideo.Name) {
+				newVideo.Path = dst
+				persistVideo(newVideo, db)
+			}
+			return
+		}
+	}
+
+	if !move {
 		return
 	}
 
@@ -146,20 +160,41 @@ func computeOtherNameFolder(path string, video datatype.Video) string {
 	duration := video.Duration
 	base := findBase(path)
 
-	if duration > 7200 {
+	if duration < 300 {
+		return base + "/O/O1_under05"
+	} else if duration < 600 {
+		return base + "/O/O2_under10"
+	} else if duration < 900 {
+		return base + "/O/O3_under15"
+	} else if duration < 1200 {
+		return base + "/O/O4_under20"
+	} else if duration < 1500 {
+		return base + "/O/O5_under25"
+	} else if duration < 1800 {
+		return base + "/O/O6_under30"
+	} else if duration < 2100 {
+		return base + "/O/O7_under35"
+	} else if duration < 2400 {
+		return base + "/O/O8_under40"
+	} else if duration < 2700 {
+		return base + "/O/O9_under45"
+	} else if duration < 3000 {
+		return base + "/O/O10_under50"
+	} else if duration < 3300 {
+		return base + "/O/O11_under55"
+	} else if duration < 3600 {
+		return base + "/O/O12_under60"
+	} else if duration < 3900 {
+		return base + "/O/O13_under65"
+	} else if duration < 4200 {
+		return base + "/O/O14_under70"
+	} else if duration > 7200 {
 		return base + "/O/O17_over120"
-	}
-	if duration > 5400 {
+	} else if duration > 5400 {
 		return base + "/O/O16_over90"
-	}
-	if duration > 4200 {
+	} else {
 		return base + "/O/O15_over70"
 	}
-
-	index := (duration / 300) + 1
-	limit := index * 5
-
-	return fmt.Sprintf("%s/O/O%d_under%02d", base, index, limit)
 }
 
 func findBase(path string) string {

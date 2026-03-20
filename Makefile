@@ -20,6 +20,9 @@ persist:
 sorting:
 	go run main.go sort --paths "/mnt/f/N" --move=false
 
+moving:
+	go run main.go sort --paths "/mnt/x/N/_dedup" --move=true --search=false
+
 #,/mnt/c/Users/fabien/Downloads/N,/mnt/c/Users/fabien/Downloads/T
 
 sortingAll:
