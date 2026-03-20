@@ -23,7 +23,7 @@ func newFilterCommand() *cobra.Command {
 
 	c := &cobra.Command{
 		Use:  "filter",
-		Long: "from a temporary folder, put them in the right folder or dedup folder, compare from db",
+		Long: "from a temporary folder, put them in the right folder or _dedup folder, compare from db",
 		Run: func(cmd *cobra.Command, args []string) {
 			processFilter(path)
 		},
@@ -189,7 +189,7 @@ func moveFileMaybe(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatyp
 	} else {
 		// if yes, copy both files to a new folder to dedup them
 		src := itVideo.Path + "/" + itVideo.Name
-		dst := folder + "/dedup/" + itVideo.Name
+		dst := folder + "/_dedup/" + itVideo.Name
 
 		log.Printf("%f move new file %s to %s \n", itVideo.Duration, src, dst)
 		if utils.MoveFile(src, dst) {
@@ -204,9 +204,9 @@ func moveFileMaybe(dataInDbByDuration *datatype.CVideoEntityMap, itVideo datatyp
 
 				src := oldVideo.Path + "/" + oldVideo.Name
 
-				if !strings.Contains(oldVideo.Path, "dedup") {
+				if !strings.Contains(oldVideo.Path, "_dedup") {
 
-					dstPath := oldVideo.Path + "/dedup"
+					dstPath := oldVideo.Path + "/_dedup"
 					dst := dstPath + "/" + oldVideo.Name
 
 					log.Printf("%f move old file %s to %s \n", oldVideo.Duration, src, dst)

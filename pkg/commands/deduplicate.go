@@ -14,28 +14,28 @@ import (
 
 var sqlRequestDedup = `WITH doublons AS (
     SELECT
-        REPLACE(path, '/dedup', '') as path_normalise,
+        REPLACE(path, '/_dedup', '') as path_normalise,
         FLOOR(duration) as duration_entiere
 		FROM vidego.video
 		WHERE path IS NOT NULL
 		  AND duration IS NOT NULL
-		GROUP BY REPLACE(path, '/dedup', ''), FLOOR(duration)
+		GROUP BY REPLACE(path, '/_dedup', ''), FLOOR(duration)
 		HAVING COUNT(*) > 1
 	),
 	all_dedup as (
 	SELECT v.*
 	FROM vidego.video v
 	INNER JOIN doublons d
-		ON REPLACE(v.path, '/dedup', '') = d.path_normalise
+		ON REPLACE(v.path, '/_dedup', '') = d.path_normalise
 		AND FLOOR(v.duration) = d.duration_entiere
-	ORDER BY REPLACE(v.path, '/dedup', ''), FLOOR(v.duration), v.id)
+	ORDER BY REPLACE(v.path, '/_dedup', ''), FLOOR(v.duration), v.id)
 	select * from all_dedup where
-    path not like '%dedup%'`
+    path not like '%_dedup%'`
 
 func newDedupCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:  "dedup",
-		Long: "from db, move duplicate video to dedup folder",
+		Long: "from db, move duplicate video to _dedup folder",
 		Run: func(cmd *cobra.Command, args []string) {
 			processDedup()
 		},
@@ -89,10 +89,10 @@ func move(dedup datatype.VideoEntity, db *gorm.DB) {
 	log.Printf("dedup %s\n", dedup.Name)
 	source := dedup.Path
 	var dest string
-	if strings.Contains(dedup.Path, "dedup/dedup") {
-		dest = strings.Replace(dedup.Path, "dedup/dedup", "dedup", 1)
-	} else if !strings.Contains(dedup.Path, "dedup") {
-		dest = dedup.Path + "/dedup"
+	if strings.Contains(dedup.Path, "_dedup/_dedup") {
+		dest = strings.Replace(dedup.Path, "_dedup/_dedup", "_dedup", 1)
+	} else if !strings.Contains(dedup.Path, "_dedup") {
+		dest = dedup.Path + "/_dedup"
 	} else {
 		dest = dedup.Path
 	}

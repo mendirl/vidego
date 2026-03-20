@@ -15,7 +15,7 @@ import (
 func newPutbackCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:  "putback",
-		Long: "from the dedup folder, put video back to its original folder",
+		Long: "from the _dedup folder, put video back to its original folder",
 		Run: func(cmd *cobra.Command, args []string) {
 			processPutback()
 		},
@@ -68,7 +68,7 @@ func moveBack(dedup datatype.VideoEntity, db *gorm.DB) {
 	log.Printf("Putback %s\n", dedup.Name)
 
 	src := dedup.Path + "/" + dedup.Name
-	newDstPath := strings.ReplaceAll(dedup.Path, "/dedup", "")
+	newDstPath := strings.ReplaceAll(dedup.Path, "/_dedup", "")
 	dst := newDstPath + "/" + dedup.Name
 
 	if utils.MoveFile(src, dst) {

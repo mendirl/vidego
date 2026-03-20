@@ -14,6 +14,7 @@ func Execute() error {
 
 	commands := []*cobra.Command{
 		newDedupCommand(),
+		newDedupFileCommand(),
 		newFilterCommand(),
 		newPutbackCommand(),
 		newMoveCommand(),
