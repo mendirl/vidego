@@ -122,9 +122,9 @@ func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 		dst = computeNamedNaseFolder(path, config)
 	} else if !move {
 		return
-	} else {
-		dst = computeOtherNameFolder(path, newVideo)
 	}
+
+	dst = computeOtherNameFolder(path, newVideo)
 
 	if utils.MoveAndCheckFile(src, dst, newVideo.Name) {
 		newVideo.Path = dst
