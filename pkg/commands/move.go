@@ -51,7 +51,7 @@ func moveFiles(src string, dst string) {
 				<-semaphore
 				counterMutex.Lock()
 				counterMutex.Unlock()
-				log.Printf("Processed video: %s\n", file.Name)
+				log.Printf("Processed video: %s\n", file.Name())
 				wg.Done()
 			}()
 			if utils.MoveFile(src+"/"+file.Name(), dst+"/"+file.Name()) {

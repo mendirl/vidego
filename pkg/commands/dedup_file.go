@@ -65,6 +65,7 @@ func processDedupLocal(root string) error {
 	}
 
 	dedupRoot := filepath.Join(absRoot, "_dedup")
+	toDeleteRoot := filepath.Join(absRoot, "_to_delete")
 
 	var wg sync.WaitGroup
 	const maxGoroutines = 10
@@ -76,8 +77,8 @@ func processDedupLocal(root string) error {
 		}
 
 		if d.IsDir() {
-			// Skip '_dedup' folders themselves to avoid infinite loops or processing already deduped files
-			if d.Name() == "_dedup" {
+			// Skip special folders themselves to avoid infinite loops or processing already moved files
+			if d.Name() == "_dedup" || d.Name() == "_to_delete" {
 				return filepath.SkipDir
 			}
 
@@ -87,7 +88,7 @@ func processDedupLocal(root string) error {
 				defer wg.Done()
 				defer func() { <-semaphore }()
 
-				if err := processDirectory(dirPath, dedupRoot); err != nil {
+				if err := processDirectory(dirPath, dedupRoot, toDeleteRoot); err != nil {
 					log.Printf("Error processing directory %s: %v\n", dirPath, err)
 				}
 			}(path)
@@ -101,7 +102,7 @@ func processDedupLocal(root string) error {
 	return err
 }
 
-func processDirectory(dir string, dedupRoot string) error {
+func processDirectory(dir string, dedupRoot string, toDeleteRoot string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("failed to read directory %s: %w", dir, err)
@@ -118,7 +119,10 @@ func processDirectory(dir string, dedupRoot string) error {
 		v := video.CreateVideo(filePath)
 
 		if v.Duration == 0 {
-			log.Printf("Warning: duration is 0 for %s, skipping\n", entry.Name())
+			log.Printf("Moving %s to %s (duration is 0)\n", entry.Name(), toDeleteRoot)
+			if !utils.MoveAndCheckFile(dir, toDeleteRoot, entry.Name()) {
+				log.Printf("Failed to move %s to %s\n", entry.Name(), toDeleteRoot)
+			}
 			continue
 		}
 
