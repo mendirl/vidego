@@ -20,10 +20,11 @@ import (
 func newSortCommand() *cobra.Command {
 
 	var (
-		paths   []string
-		move    bool
-		search  bool
-		cfgFile string
+		paths     []string
+		move      bool
+		search    bool
+		toUniqueT bool
+		cfgFile   string
 	)
 
 	c := &cobra.Command{
@@ -33,7 +34,8 @@ func newSortCommand() *cobra.Command {
 			paths = viper.GetStringSlice("paths")
 			move = viper.GetBool("move")
 			search = viper.GetBool("search")
-			processSort(paths, move, search)
+			toUniqueT = viper.GetBool("uniqueSearch")
+			processSort(paths, move, search, toUniqueT)
 		},
 	}
 
@@ -45,6 +47,8 @@ func newSortCommand() *cobra.Command {
 	viper.BindPFlag("move", c.PersistentFlags().Lookup("move"))
 	c.PersistentFlags().BoolVar(&search, "search", true, "search in config to move to named folders")
 	viper.BindPFlag("search", c.PersistentFlags().Lookup("search"))
+	c.PersistentFlags().BoolVar(&toUniqueT, "uniqueSearch", false, "move all found in config to unique folder T")
+	viper.BindPFlag("uniqueSearch", c.PersistentFlags().Lookup("uniqueSearch"))
 
 	c.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vidego.yaml)")
 	viper.BindPFlag("config", c.PersistentFlags().Lookup("config"))
@@ -54,13 +58,16 @@ func newSortCommand() *cobra.Command {
 
 var sqlRequestConfig = `select * from vidego.config order by position`
 
-func processSort(paths []string, move bool, search bool) {
+func processSort(paths []string, move bool, search bool, toUniqueT bool) {
+	log.Printf("Sort command parameters: paths=%v, move=%v, search=%v, uniqueSearch=%v\n", paths, move, search, toUniqueT)
 	db := database.Connect()
 
 	var configs []datatype.ConfigEntity
 	if search {
 		db.Raw(sqlRequestConfig).Scan(&configs)
 	}
+
+	log.Printf("nb of config : %d\n", len(configs))
 
 	var wg sync.WaitGroup
 
@@ -71,14 +78,14 @@ func processSort(paths []string, move bool, search bool) {
 			defer func() {
 				wg.Done()
 			}()
-			sortFolder(p, configs, db, move, search)
+			sortFolder(p, configs, db, move, search, toUniqueT)
 		}(path)
 	}
 
 	wg.Wait()
 }
 
-func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool, search bool) {
+func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool, search bool, toUniqueT bool) {
 	const maxGoroutines = 10
 	semaphore := make(chan struct{}, maxGoroutines)
 	var wg sync.WaitGroup
@@ -88,7 +95,7 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 			if err != nil {
 				return err
 			}
-			if info.IsDir() || !strings.HasSuffix(path, ".mp4") {
+			if info.IsDir() || !(strings.HasSuffix(path, ".mp4") || strings.HasSuffix(path, ".mkv")) {
 				return nil
 			}
 
@@ -99,7 +106,7 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 					<-semaphore
 					wg.Done()
 				}()
-				handleFile(filePath, configs, db, move, search)
+				handleFile(filePath, configs, db, move, search, toUniqueT)
 			}(path)
 
 			return nil
@@ -111,7 +118,7 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 	wg.Wait()
 }
 
-func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool, search bool) {
+func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool, search bool, toUniqueT bool) {
 	newVideo := video.CreateVideo(path)
 
 	if newVideo.Duration == 0 {
@@ -125,7 +132,7 @@ func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 		var match, config = findInConfigs(newVideo.Name, configs)
 
 		if match {
-			dst = computeNamedNaseFolder(path, config)
+			dst = computeNamedNaseFolder(path, config, toUniqueT)
 			if utils.MoveAndCheckFile(src, dst, newVideo.Name) {
 				newVideo.Path = dst
 				persistVideo(newVideo, db)
@@ -151,8 +158,11 @@ func persistVideo(newVideo datatype.Video, db *gorm.DB) {
 	db.Create(&entity)
 }
 
-func computeNamedNaseFolder(path string, config string) string {
+func computeNamedNaseFolder(path string, config string, toUniqueT bool) string {
 	base := findBase(path) + "/N/"
+	if toUniqueT {
+		return base + "T"
+	}
 	return base + config
 }
 
@@ -217,19 +227,19 @@ func findInConfigs(videoName string, configs []datatype.ConfigEntity) (bool, str
 	return false, ""
 }
 
-func containsWord(word, subword string) bool {
-	word = strings.ToLower(word)
+func containsWord(videoName, subword string) bool {
+	videoName = strings.ToLower(videoName)
 	subword = strings.ToLower(subword)
 
 	if strings.Contains(subword, " ") {
 		split := strings.Split(subword, " ")
 		for _, w := range split {
-			if !strings.Contains(word, w) {
+			if !strings.Contains(videoName, w) {
 				return false
 			}
 		}
 		return true
 	} else {
-		return strings.Contains(word, subword)
+		return strings.Contains(videoName, subword)
 	}
 }
