@@ -47,7 +47,7 @@ func newSortCommand() *cobra.Command {
 	viper.BindPFlag("move", c.PersistentFlags().Lookup("move"))
 	c.PersistentFlags().BoolVar(&search, "search", true, "search in config to move to named folders")
 	viper.BindPFlag("search", c.PersistentFlags().Lookup("search"))
-	c.PersistentFlags().BoolVar(&toUniqueT, "uniqueSearch", false, "move all found in config to unique folder T")
+	c.PersistentFlags().BoolVar(&toUniqueT, "uniqueSearch", false, "move all found in config to unique folder _ALL")
 	viper.BindPFlag("uniqueSearch", c.PersistentFlags().Lookup("uniqueSearch"))
 
 	c.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vidego.yaml)")
@@ -161,7 +161,7 @@ func persistVideo(newVideo datatype.Video, db *gorm.DB) {
 func computeNamedNaseFolder(path string, config string, toUniqueT bool) string {
 	base := findBase(path) + "/N/"
 	if toUniqueT {
-		return base + "T"
+		return base + "_ALL"
 	}
 	return base + config
 }
@@ -208,7 +208,7 @@ func computeOtherNameFolder(path string, video datatype.Video) string {
 }
 
 func findBase(path string) string {
-	re := regexp.MustCompile(`/([cdefghnx])/`)
+	re := regexp.MustCompile(`/([cdefghjnx])/`)
 	match := re.FindStringSubmatch(path)
 	if len(match) > 1 {
 		return "/mnt/" + match[1]

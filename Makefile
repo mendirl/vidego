@@ -4,6 +4,7 @@ mount:
 	sudo mount -t  drvfs D: /mnt/d
 	sudo mount -t  drvfs E: /mnt/e
 	sudo mount -t  drvfs X: /mnt/x
+	sudo mount -t  drvfs J: /mnt/j
 
 install:
 	go get .
@@ -15,13 +16,28 @@ run:
 	go run main.go
 
 persist:
-	go run main.go persist --path "/mnt/f/O"
+	go run main.go persist --path "/mnt/c/Users/fabien/Downloads/T,/mnt/c/Users/fabien/Downloads/O","/mnt/e/data/T","/mnt/f/T"
 
 sorting:
-	go run main.go sort --paths "/mnt/f/N" --move=false
+# /mnt/c/Users/fabien/Downloads/T,
+# /mnt/c/Users/fabien/Downloads/O,
+# /mnt/e/O,
+# /mnt/e/O/O6_under30,
+# /mnt/e/T,
+# /mnt/e/data/O,
+# /mnt/e/data/T,
+# /mnt/e/data/N,
+# /mnt/e/data/N/_dedup,
+# /mnt/j/N/_ALL
+# /mnt/f/T,
+#--uniqueSearch
+	go run main.go sort --paths "/mnt/c/Users/fabien/Downloads" --move=false --search=true --uniqueSearch
+
+dedup_file:
+	go run main.go dedupFile --paths "/mnt/e/data/N"
 
 moving:
-	go run main.go sort --paths "/mnt/x/N/_dedup" --move=true --search=false
+	go run main.go sort --paths "/mnt/e/data/N/_dedup" --move=true --search=false
 
 #,/mnt/c/Users/fabien/Downloads/N,/mnt/c/Users/fabien/Downloads/T
 
@@ -31,9 +47,6 @@ sortingAll:
 dedup:
 	go run main.go sort --paths "/mnt/d/O/O15_over70,/mnt/d/O/O16_over90,/mnt/d/O/O14_under70,/mnt/d/O/O13_under65" --move=false
 	go run main.go dedup C:\Users\fabien\Downloads
-
-dedup_file:
-	go run main.go dedupFile "/mnt/x/N"
 
 filtering:
 	go run main.go filter --path "/mnt/f/T"
