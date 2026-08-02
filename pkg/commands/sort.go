@@ -155,6 +155,7 @@ func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 			if utils.MoveAndCheckFile(src, dst, newVideo.Name) {
 				newVideo.Path = dst
 				persistVideo(newVideo, db)
+				return
 			}
 		}
 	}
