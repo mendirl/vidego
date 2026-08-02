@@ -59,7 +59,7 @@ func computeVideos(source string, videos *datatype.CVideoEntityList, wg *sync.Wa
 
 	files, err := os.ReadDir(source)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("error reading directory %s: %v\n", source, err)
 		return
 	}
 

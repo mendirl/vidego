@@ -73,7 +73,8 @@ func processDedupLocal(root string) error {
 
 	err = filepath.WalkDir(absRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			log.Printf("error accessing path %q: %v\n", path, err)
+			return nil
 		}
 
 		if d.IsDir() {

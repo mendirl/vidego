@@ -82,7 +82,7 @@ func DeleteFile(path string) bool {
 	if Exists(path) {
 		err := os.Remove(path)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("error deleting file %s: %v\n", path, err)
 			return false
 		}
 		return true

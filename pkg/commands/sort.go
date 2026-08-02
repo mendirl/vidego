@@ -96,7 +96,8 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 	err := filepath.Walk(path,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return err
+				log.Printf("error accessing path %q: %v\n", path, err)
+				return nil
 			}
 			if info.IsDir() {
 				return nil

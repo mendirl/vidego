@@ -1,11 +1,12 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"sync"
 	"vidego/pkg/utils"
+
+	"github.com/spf13/cobra"
 )
 
 func newMoveCommand() *cobra.Command {
@@ -31,7 +32,7 @@ func newMoveCommand() *cobra.Command {
 func moveFiles(src string, dst string) {
 	files, err := os.ReadDir(src)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("error reading source directory %s: %v\n", src, err)
 		return
 	}
 
