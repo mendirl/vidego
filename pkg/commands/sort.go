@@ -98,7 +98,11 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 			if err != nil {
 				return err
 			}
-			if info.IsDir() || !(strings.HasSuffix(path, ".mp4") || strings.HasSuffix(path, ".mkv")) {
+			if info.IsDir() {
+				return nil
+			}
+			lowerPath := strings.ToLower(path)
+			if !(strings.HasSuffix(lowerPath, ".mp4") || strings.HasSuffix(lowerPath, ".mkv") || strings.HasSuffix(lowerPath, ".avi") || strings.HasSuffix(lowerPath, ".wmv") || strings.HasSuffix(lowerPath, ".mov")) {
 				return nil
 			}
 
@@ -122,13 +126,24 @@ func sortFolder(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 }
 
 func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move bool, search bool, toUniqueT bool) {
-	newVideo := video.CreateVideo(path)
+	newVideo, err := video.CreateVideo(path)
+	var dst, src string
 
-	if newVideo.Duration == 0 {
+	if err != nil || (newVideo.Duration == 0 && !newVideo.Complete) {
+		if !move {
+			return
+		}
+		var name = filepath.Base(path)
+		var match, _ = findInConfigs(name, configs)
+		if match {
+			dst = findBase(path) + "/P"
+		} else {
+			dst = findBase(path) + "/O/O"
+		}
+		utils.MoveAndCheckFile(filepath.ToSlash(filepath.Dir(path)), dst, name)
 		return
 	}
 
-	var dst, src string
 	src = newVideo.Path
 
 	if search {
@@ -147,6 +162,10 @@ func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 		return
 	}
 	dst = computeOtherNameFolder(path, newVideo)
+
+	if dst == "" {
+		return
+	}
 
 	if utils.MoveAndCheckFile(src, dst, newVideo.Name) {
 		newVideo.Path = dst
@@ -209,6 +228,7 @@ func computeOtherNameFolder(path string, video datatype.Video) string {
 }
 
 func findBase(path string) string {
+	path = filepath.ToSlash(path)
 	re := regexp.MustCompile(`/([cdefghjnx])/`)
 	match := re.FindStringSubmatch(path)
 	if len(match) > 1 {

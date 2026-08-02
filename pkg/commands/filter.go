@@ -88,7 +88,12 @@ func computeVideos(source string, videos *datatype.CVideoEntityList, wg *sync.Wa
 func computeVideo(source string, videos *datatype.CVideoEntityList, fileInfo fs.FileInfo, wg *sync.WaitGroup) {
 	defer wg.Done()
 	//define its duration for a video
-	newVideo := video.CreateVideo(source + "/" + fileInfo.Name())
+	newVideo, err := video.CreateVideo(source + "/" + fileInfo.Name())
+
+	if err != nil {
+		log.Printf("Error creating video for %s: %v\n", fileInfo.Name(), err)
+		return
+	}
 
 	log.Printf("video : %v \n", newVideo)
 	entity := datatype.VideoEntity{Name: newVideo.Name, Path: newVideo.Path, Duration: newVideo.Duration, Size: newVideo.Size, Complete: newVideo.Complete}

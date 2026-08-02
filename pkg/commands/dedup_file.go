@@ -116,10 +116,13 @@ func processDirectory(dir string, dedupRoot string, toDeleteRoot string) error {
 		}
 
 		filePath := filepath.Join(dir, entry.Name())
-		v := video.CreateVideo(filePath)
+		v, err := video.CreateVideo(filePath)
 
-		if v.Duration == 0 {
-			log.Printf("Moving %s to %s (duration is 0)\n", entry.Name(), toDeleteRoot)
+		if err != nil || v.Duration == 0 {
+			if err != nil {
+				log.Printf("Error processing %s: %v\n", entry.Name(), err)
+			}
+			log.Printf("Moving %s to %s (duration is 0 or error)\n", entry.Name(), toDeleteRoot)
 			if !utils.MoveAndCheckFile(dir, toDeleteRoot, entry.Name()) {
 				log.Printf("Failed to move %s to %s\n", entry.Name(), toDeleteRoot)
 			}
