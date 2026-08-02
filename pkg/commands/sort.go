@@ -43,10 +43,13 @@ func newSortCommand() *cobra.Command {
 
 	c.PersistentFlags().StringSliceVar(&paths, "paths", []string{}, "")
 	viper.BindPFlag("paths", c.PersistentFlags().Lookup("paths"))
-	c.PersistentFlags().BoolVar(&move, "move", true, "")
+
+	c.PersistentFlags().BoolVar(&move, "move", true, "move to O folder")
 	viper.BindPFlag("move", c.PersistentFlags().Lookup("move"))
+
 	c.PersistentFlags().BoolVar(&search, "search", true, "search in config to move to named folders")
 	viper.BindPFlag("search", c.PersistentFlags().Lookup("search"))
+
 	c.PersistentFlags().BoolVar(&toUniqueT, "uniqueSearch", false, "move all found in config to unique folder _ALL")
 	viper.BindPFlag("uniqueSearch", c.PersistentFlags().Lookup("uniqueSearch"))
 
@@ -137,14 +140,12 @@ func handleFile(path string, configs []datatype.ConfigEntity, db *gorm.DB, move 
 				newVideo.Path = dst
 				persistVideo(newVideo, db)
 			}
-			return
 		}
 	}
 
 	if !move {
 		return
 	}
-
 	dst = computeOtherNameFolder(path, newVideo)
 
 	if utils.MoveAndCheckFile(src, dst, newVideo.Name) {
