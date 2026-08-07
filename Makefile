@@ -30,8 +30,9 @@ sorting:
 # /mnt/e/data/N/_dedup,
 # /mnt/j/N/_ALL
 # /mnt/f/T,
+# /mnt/d/_dedup,
 #--uniqueSearch
-	go run main.go sort --paths "/mnt/c/Users/fabien/Downloads" --move=false --search=true --uniqueSearch
+	go run main.go sort --paths "/mnt/d/_dedup" --move=true --search=false
 
 dedup_file:
 	go run main.go dedupFile --paths "/mnt/e/data/N"
