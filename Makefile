@@ -32,10 +32,12 @@ sorting:
 # /mnt/f/T,
 # /mnt/d/_dedup,
 #--uniqueSearch
-	go run main.go sort --paths "/mnt/d/_dedup" --move=true --search=false
+	go run main.go sort --paths "/run/media/fabien/My Passport/N/_ALL" --base "/run/media/fabien/My Passport/" --move=false --search=true
+#	go run main.go sort --paths "/run/media/fabien/My Passport/O,/run/media/fabien/My Passport/T" --base "/run/media/fabien/My Passport/" --move=false --search=true --uniqueSearch
+#	go run main.go sort --paths "/home/fabien/Téléchargements" --base "/home/fabien/Vidéos/" --move=false --search=true
 
 dedup_file:
-	go run main.go dedupFile --paths "/mnt/e/data/N"
+	go run main.go dedupFile --paths "/run/media/fabien/My Passport/N"
 
 moving:
 	go run main.go sort --paths "/mnt/e/data/N/_dedup" --move=true --search=false
